@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Void Runner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#05070d;
+    --deep:#070b14;
+    --panel:#0b1424;
+    --panel-alt:#101c33;
+    --line:#1c2b45;
+    --line-bright:#2a4066;
+    --cyan:#4ff0ff;
+    --cyan-dim:#2a8a99;
+    --magenta:#ff3d81;
+    --magenta-dim:#99204f;
+    --amber:#ffb84d;
+    --green:#4dff9f;
+    --text:#d7e6ff;
+    --text-dim:#8095b8;
+    --text-faint:#4a5978;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--void);}
+  body{
+    font-family:'Rajdhani',sans-serif;
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.mono,.orbitron{font-family:'Orbitron',sans-serif;}
+
+  #game{position:fixed;inset:0;display:block;background:var(--void);}
+
+  #scanlines{
+    position:fixed;inset:0;pointer-events:none;z-index:60;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 2px, transparent 4px);
+    mix-blend-mode:overlay;
+  }
+  #vignette{
+    position:fixed;inset:0;pointer-events:none;z-index:59;
+    box-shadow:inset 0 0 180px rgba(0,0,0,0.85);
+  }
+
+  #ui{position:fixed;inset:0;z-index:10;pointer-events:none;}
+  .screen{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:auto;}
+  .screen.active{display:flex;}
+
+  ::selection{background:var(--cyan);color:#000;}
+
+  /* ---------- shared components ---------- */
+  .panel{
+    background:linear-gradient(180deg, rgba(16,28,51,0.88), rgba(9,15,28,0.92));
+    border:1px solid var(--line);
+    clip-path:polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+    box-shadow:0 0 0 1px rgba(79,240,255,0.04) inset, 0 0 30px rgba(79,240,255,0.05);
+    position:relative;
+  }
+  .eyebrow{
+    font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;color:var(--text-faint);
+    text-transform:uppercase;
+  }
+  .btn{
+    font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;
+    background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);
+    padding:12px 22px;cursor:pointer;
+    clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+    transition:all .15s ease;
+  }
+  .btn:hover:not(:disabled){background:rgba(79,240,255,0.1);border-color:var(--cyan);box-shadow:0 0 18px rgba(79,240,255,0.25);}
+  .btn:disabled{color:var(--text-faint);border-color:var(--line);cursor:not-allowed;opacity:.6;}
+  .btn-primary{background:rgba(79,240,255,0.12);border-color:var(--cyan);}
+  .btn-primary:hover:not(:disabled){background:rgba(79,240,255,0.22);}
+  .btn-small{padding:8px 14px;font-size:11px;letter-spacing:1.5px;}
+
+  /* ---------- title screen ---------- */
+  #screen-title{flex-direction:column;gap:26px;text-align:center;}
+  .title-logo{
+    font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(42px,8vw,84px);
+    letter-spacing:8px;color:var(--cyan);margin:0;
+    text-shadow:0 0 8px rgba(79,240,255,0.8), 0 0 24px rgba(79,240,255,0.5), 0 0 60px rgba(79,240,255,0.3);
+  }
+  .title-sub{color:var(--text-dim);letter-spacing:4px;font-size:14px;text-transform:uppercase;margin-top:-14px;}
+  .keycap-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
+  .keycap-item{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;letter-spacing:1px;}
+  .keycap{
+    font-family:'Orbitron',sans-serif;font-size:12px;color:var(--text);
+    border:1px solid var(--line-bright);background:var(--panel-alt);
+    padding:6px 10px;min-width:14px;text-align:center;
+    clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+  }
+
+  /* ---------- hangar screen ---------- */
+  #screen-hangar{align-items:stretch;justify-content:stretch;}
+  .hangar-wrap{width:100%;height:100%;display:flex;flex-direction:column;padding:22px;gap:16px;}
+  .hangar-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+  .hangar-title{font-size:20px;letter-spacing:6px;color:var(--cyan);margin:0;}
+  .credits-pill{
+    font-family:'Orbitron',sans-serif;font-size:15px;letter-spacing:1px;color:var(--amber);
+    border:1px solid rgba(255,184,77,0.4);background:rgba(255,184,77,0.06);
+    padding:9px 18px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  }
+  .hangar-body{flex:1;display:grid;grid-template-columns:320px 1fr;gap:16px;min-height:0;}
+  .col{display:flex;flex-direction:column;gap:16px;min-height:0;}
+
+  #missionListPanel{padding:16px;overflow-y:auto;flex:1;min-height:0;}
+  #missionList{display:flex;flex-direction:column;gap:8px;}
+  .mission-item{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    background:var(--panel-alt);border:1px solid var(--line);color:var(--text);
+    padding:10px 12px;cursor:pointer;font-family:'Rajdhani',sans-serif;
+    clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  }
+  .mission-item:hover:not(:disabled){border-color:var(--cyan-dim);}
+  .mission-item.selected{border-color:var(--cyan);box-shadow:0 0 14px rgba(79,240,255,0.2);}
+  .mission-item:disabled{opacity:.45;cursor:not-allowed;}
+  .mission-num{font-family:'Orbitron',sans-serif;font-size:11px;color:var(--text-faint);}
+  .mission-name{flex:1;font-weight:600;font-size:15px;}
+  .mission-status{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;color:var(--green);}
+  .mission-item.locked .mission-status{color:var(--text-faint);}
+
+  #missionDetail{padding:18px 20px;flex-shrink:0;}
+  .detail-name{font-family:'Orbitron',sans-serif;font-size:18px;color:var(--cyan);letter-spacing:1px;margin-bottom:6px;}
+  .detail-brief{color:var(--text-dim);font-size:15px;margin-bottom:12px;line-height:1.4;}
+  .detail-obj,.detail-reward{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:6px;}
+  .detail-reward{color:var(--amber);}
+  #launchBtn{margin-top:10px;}
+
+  .ship-and-upgrades{flex:1;display:grid;grid-template-columns:240px 1fr;gap:16px;min-height:0;}
+  #blueprintPanel{display:flex;align-items:center;justify-content:center;padding:10px;}
+  #blueprintCanvas{width:100%;height:100%;display:block;}
+
+  #upgradesPanel{padding:16px;overflow-y:auto;}
+  .upgrade-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+  .upgrade-card{
+    background:var(--panel-alt);border:1px solid var(--line);padding:14px;
+    clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .upgrade-name{font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:1px;color:var(--cyan);}
+  .upgrade-stat{font-size:13px;color:var(--text-dim);}
+  .pip-row{display:flex;gap:5px;margin:4px 0;}
+  .pip{width:18px;height:6px;background:var(--line);}
+  .pip.filled{background:var(--cyan);box-shadow:0 0 6px rgba(79,240,255,0.6);}
+  .upgrade-next{font-size:12px;color:var(--text-faint);}
+  .upgrade-cost{color:var(--amber);}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;z-index:20;pointer-events:none;font-family:'Orbitron',sans-serif;}
+  #hud.hidden{display:none;}
+  .hud-top{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:20px 26px;}
+  .hud-objective{
+    background:rgba(9,15,28,0.7);border:1px solid var(--line);padding:10px 16px;
+    font-size:12px;letter-spacing:1.5px;color:var(--text);
+    clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
+  }
+  .hud-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  .hud-lives{display:flex;gap:6px;}
+  .life-icon{color:var(--cyan);font-size:16px;text-shadow:0 0 6px rgba(79,240,255,0.8);}
+  .life-icon.spent{color:var(--text-faint);text-shadow:none;opacity:.3;}
+  .hud-shield{display:flex;gap:6px;}
+  .hud-shield.hidden{display:none;}
+  .shield-icon{color:#7fd7ff;font-size:14px;text-shadow:0 0 6px rgba(127,215,255,0.8);}
+  .shield-icon.spent{color:var(--text-faint);text-shadow:none;opacity:.3;}
+  .hud-missile{
+    background:rgba(9,15,28,0.7);border:1px solid var(--line);padding:6px 14px;
+    font-size:11px;letter-spacing:1.5px;color:var(--text-faint);
+    clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  }
+  .hud-missile.ready{color:var(--amber);border-color:rgba(255,184,77,0.4);}
+  .hud-missile.hidden{display:none;}
+  .hud-timer{
+    background:rgba(9,15,28,0.7);border:1px solid var(--line);padding:6px 14px;
+    font-size:13px;color:var(--amber);letter-spacing:1px;
+    clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  }
+  .hud-timer.hidden{display:none;}
+  .hud-hint{
+    position:absolute;bottom:18px;left:0;right:0;text-align:center;
+    font-size:11px;letter-spacing:2px;color:var(--text-faint);
+  }
+
+  /* ---------- end screen ---------- */
+  .end-card{width:min(460px,90vw);padding:38px 34px;text-align:center;}
+  .end-title{font-family:'Orbitron',sans-serif;font-size:26px;letter-spacing:3px;margin-bottom:14px;}
+  .end-title.success{color:var(--green);text-shadow:0 0 18px rgba(77,255,159,0.5);}
+  .end-title.fail{color:var(--magenta);text-shadow:0 0 18px rgba(255,61,129,0.5);}
+  .end-mission{color:var(--text-dim);font-size:15px;margin-bottom:18px;}
+  .end-credits{font-family:'Orbitron',sans-serif;font-size:15px;color:var(--amber);letter-spacing:1px;margin-bottom:26px;}
+
+  @media (max-width:820px){
+    .hangar-body{grid-template-columns:1fr;}
+    .ship-and-upgrades{grid-template-columns:1fr;}
+    .upgrade-grid{grid-template-columns:1fr;}
+    #blueprintPanel{height:160px;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+
+<div id="ui">
+
+  <section id="screen-title" class="screen active">
+    <div>
+      <h1 class="title-logo">VOID RUNNER</h1>
+      <div class="title-sub">Fly missions · earn credits · upgrade your ship</div>
+      <div class="keycap-row">
+        <div class="keycap-item"><span class="keycap">W</span> Thrust</div>
+        <div class="keycap-item"><span class="keycap">A</span>/<span class="keycap">D</span> Rotate</div>
+        <div class="keycap-item"><span class="keycap">Space</span> Fire</div>
+        <div class="keycap-item"><span class="keycap">Shift</span> Missile</div>
+        <div class="keycap-item"><span class="keycap">Esc</span> Abort mission</div>
+      </div>
+      <div style="margin-top:32px;">
+        <button id="startBtn" class="btn btn-primary">Enter Hangar</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-hangar" class="screen">
+    <div class="hangar-wrap">
+      <div class="hangar-header">
+        <h2 class="hangar-title">HANGAR</h2>
+        <div class="credits-pill" id="hangarCredits">0 CR</div>
+      </div>
+      <div class="hangar-body">
+        <div class="col">
+          <div class="panel" id="missionListPanel">
+            <div class="eyebrow" style="margin-bottom:10px;">Mission Roster</div>
+            <div id="missionList"></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="panel" id="missionDetail"></div>
+          <div class="ship-and-upgrades">
+            <div class="panel" id="blueprintPanel">
+              <canvas id="blueprintCanvas" width="220" height="260"></canvas>
+            </div>
+            <div class="panel" id="upgradesPanel">
+              <div class="eyebrow" style="margin-bottom:10px;">Ship Upgrades</div>
+              <div class="upgrade-grid" id="upgradeGrid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-end" class="screen">
+    <div class="panel end-card">
+      <div class="end-title">MISSION COMPLETE</div>
+      <div class="end-mission"></div>
+      <div class="end-credits"></div>
+      <button id="endHangarBtn" class="btn btn-primary">Return to Hangar</button>
+    </div>
+  </section>
+
+</div>
+
+<div id="hud" class="hidden">
+  <div class="hud-top">
+    <div class="hud-objective" id="hudObjective">OBJECTIVE</div>
+    <div class="hud-right">
+      <div class="hud-lives" id="hudLives"></div>
+      <div class="hud-shield hidden" id="hudShield"></div>
+      <div class="hud-missile hidden" id="hudMissile">MISSILES READY</div>
+      <div class="hud-timer hidden" id="hudTimer">0s</div>
+    </div>
+  </div>
+  <div class="hud-hint" id="hudHint">W THRUST · A/D ROTATE · SPACE FIRE · ESC ABORT</div>
+</div>
+
+<script>
+/* =====================================================================
+   VOID RUNNER — self-contained HTML5 canvas game
+   ===================================================================== */
+
+/* ---------------------------- canvas / dpr ---------------------------- */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  initStars();
+}
+window.addEventListener('resize', resize);
+
+/* ---------------------------- input ---------------------------- */
+const keys = new Set();
+window.addEventListener('keydown', e=>{
+  if(['KeyW','ArrowUp','KeyA','ArrowLeft','KeyD','ArrowRight','Space','ShiftLeft','ShiftRight'].includes(e.code)) e.preventDefault();
+  keys.add(e.code);
+  if(e.code==='Escape') handleEscape();
+});
+window.addEventListener('keyup', e=> keys.delete(e.code));
+
+/* ---------------------------- utility ---------------------------- */
+function rand(a,b){ return a + Math.random()*(b-a); }
+function dist2(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; }
+function wrap(pos,max){ if(pos<0) return pos+max; if(pos>max) return pos-max; return pos; }
+function wrapDelta(a,b,max){ let d=b-a; if(d>max/2) d-=max; if(d<-max/2) d+=max; return d; }
+function filterInPlace(arr, keepFn){ let w=0; for(let i=0;i<arr.length;i++){ if(keepFn(arr[i])) arr[w++]=arr[i]; } arr.length=w; }
+
+/* ---------------------------- config ---------------------------- */
+const UPGRADE_TRACKS = {
+  weapon:{
+    name:'Weapons',
+    levels:[
+      {cooldown:0.38, bulletSpeed:520, damage:1, cost:0},
+      {cooldown:0.30, bulletSpeed:560, damage:1, cost:120},
+      {cooldown:0.23, bulletSpeed:600, damage:2, cost:220},
+      {cooldown:0.16, bulletSpeed:650, damage:2, cost:380},
+      {cooldown:0.10, bulletSpeed:690, damage:2, cost:450},
+    ],
+    desc:l=>`Fire rate ${(1/l.cooldown).toFixed(1)}/s · Damage ${l.damage}`,
+  },
+  engine:{
+    name:'Engine',
+    levels:[
+      {thrust:230, maxSpeed:300, turnSpeed:3.2, cost:0},
+      {thrust:270, maxSpeed:340, turnSpeed:3.6, cost:120},
+      {thrust:310, maxSpeed:380, turnSpeed:4.0, cost:220},
+      {thrust:360, maxSpeed:430, turnSpeed:4.5, cost:380},
+    ],
+    desc:l=>`Thrust ${l.thrust} · Max speed ${l.maxSpeed}`,
+  },
+  hull:{
+    name:'Hull',
+    levels:[
+      {maxLives:3, invuln:1.6, cost:0},
+      {maxLives:4, invuln:1.8, cost:150},
+      {maxLives:5, invuln:2.0, cost:260},
+      {maxLives:6, invuln:2.2, cost:400},
+    ],
+    desc:l=>`Lives ${l.maxLives} · Invuln ${l.invuln.toFixed(1)}s`,
+  },
+  shield:{
+    name:'Shields',
+    levels:[
+      {maxCharges:0, regenTime:0,   cost:0},
+      {maxCharges:1, regenTime:6.5, cost:180},
+      {maxCharges:2, regenTime:5.5, cost:320},
+      {maxCharges:3, regenTime:4.5, cost:480},
+    ],
+    desc:l=> l.maxCharges===0 ? 'No shield generator installed' : `Charges ${l.maxCharges} · Regen ${l.regenTime.toFixed(1)}s`,
+  },
+  missiles:{
+    name:'Missiles',
+    levels:[
+      {count:0, cooldown:0,   damage:0, splash:0,  cost:0},
+      {count:1, cooldown:3.0, damage:4, splash:42, cost:200},
+      {count:1, cooldown:2.2, damage:5, splash:56, cost:340},
+      {count:2, cooldown:1.8, damage:6, splash:70, cost:520},
+    ],
+    desc:l=> l.count===0 ? 'No missile rack installed' : `${l.count}× rack · ${l.damage} dmg · ${l.splash}px splash`,
+  },
+};
+
+const MISSIONS = [
+  {id:'m1', name:'Training Run',   brief:'Clear a light asteroid field to prove you can fly.',            type:'asteroids', target:5,  spawn:{asteroidInterval:1.4, enemyInterval:Infinity}, reward:100},
+  {id:'m2', name:'First Contact',  brief:'Hostile scouts detected. Take down 3 enemy ships.',              type:'enemies',    target:3,  spawn:{asteroidInterval:2.2, enemyInterval:4.5}, reward:150},
+  {id:'m3', name:'Asteroid Field', brief:'Survive 60 seconds inside a dense asteroid belt.',                type:'survive',    target:60, spawn:{asteroidInterval:0.7, enemyInterval:Infinity}, reward:175},
+  {id:'m4', name:'Convoy Buster',  brief:'Destroy 6 enemy ships before the convoy scatters.',                type:'enemies',    target:6,  timeLimit:90, spawn:{asteroidInterval:2.6, enemyInterval:2.8}, reward:250},
+  {id:'m5', name:'Endurance',      brief:'Hold the line for 90 seconds against escalating waves.',           type:'survive',    target:90, spawn:{asteroidInterval:1.1, enemyInterval:3.4, ramp:true}, reward:300},
+  {id:'m6', name:'Last Stand',     brief:'Destroy 10 enemy ships. Elites are inbound. This is the big one.', type:'enemies',    target:10, spawn:{asteroidInterval:1.0, enemyInterval:2.0, eliteChance:0.3, ramp:true}, reward:500},
+];
+
+/* ---------------------------- game state ---------------------------- */
+const game = {
+  state:'title', // title | hangar | mission | end
+  credits:0,
+  upgrades:{weapon:0, engine:0, hull:0, shield:0, missiles:0},
+  unlockedMissionIndex:0,
+  completedMissions:new Set(),
+  selectedMissionId:'m1',
+  lastEndResult:null,
+};
+
+let mission = null;
+const bullets=[], enemyBullets=[], missiles=[], asteroids=[], enemies=[], particles=[];
+
+let shakeMag=0, shakeTime=0;
+function shake(mag){ shakeMag=mag; shakeTime=0.3; }
+
+/* ---------------------------- stars ---------------------------- */
+let stars = [];
+function initStars(){
+  stars = [];
+  const count = Math.floor((canvas.width*canvas.height)/9000);
+  for(let i=0;i<count;i++){
+    stars.push({x:rand(0,canvas.width), y:rand(0,canvas.height), r:rand(0.4,1.8), tw:rand(0,Math.PI*2)});
+  }
+}
+function drawStars(dt){
+  ctx.save();
+  for(const s of stars){
+    s.tw += dt*1.4;
+    const alpha = 0.35+0.4*Math.sin(s.tw);
+    ctx.fillStyle = `rgba(200,220,255,${Math.max(0,alpha).toFixed(2)})`;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---------------------------- ship ---------------------------- */
+class Ship{
+  constructor(){ this.reset(); }
+  reset(){
+    this.x = canvas.width/2; this.y = canvas.height/2;
+    this.vx=0; this.vy=0; this.angle=0;
+    this.radius=13;
+    this.invulnTimer=1.6;
+    this.fireCooldown=0;
+    this.missileCooldown=0;
+    this.thrusting=false;
+    this.alive=true;
+    this.shieldFlash=0;
+    const shieldLvl = UPGRADE_TRACKS.shield.levels[game.upgrades.shield];
+    this.shield = shieldLvl.maxCharges;
+    this.shieldRegenTimer = shieldLvl.regenTime;
+  }
+  get stats(){
+    return {
+      wpn: UPGRADE_TRACKS.weapon.levels[game.upgrades.weapon],
+      eng: UPGRADE_TRACKS.engine.levels[game.upgrades.engine],
+      hull: UPGRADE_TRACKS.hull.levels[game.upgrades.hull],
+      shield: UPGRADE_TRACKS.shield.levels[game.upgrades.shield],
+      missile: UPGRADE_TRACKS.missiles.levels[game.upgrades.missiles],
+    };
+  }
+  update(dt){
+    const {wpn,eng,shield,missile} = this.stats;
+    if(keys.has('KeyA') || keys.has('ArrowLeft')) this.angle -= eng.turnSpeed*dt;
+    if(keys.has('KeyD') || keys.has('ArrowRight')) this.angle += eng.turnSpeed*dt;
+
+    this.thrusting = (keys.has('KeyW') || keys.has('ArrowUp'));
+    if(this.thrusting){
+      this.vx += Math.sin(this.angle)*eng.thrust*dt;
+      this.vy += -Math.cos(this.angle)*eng.thrust*dt;
+    }
+    const damp = Math.pow(0.55, dt);
+    this.vx *= damp; this.vy *= damp;
+
+    const speed = Math.hypot(this.vx,this.vy);
+    if(speed > eng.maxSpeed){ const s=eng.maxSpeed/speed; this.vx*=s; this.vy*=s; }
+
+    this.x = wrap(this.x + this.vx*dt, canvas.width);
+    this.y = wrap(this.y + this.vy*dt, canvas.height);
+
+    if(this.invulnTimer>0) this.invulnTimer -= dt;
+    if(this.shieldFlash>0) this.shieldFlash = Math.max(0, this.shieldFlash-dt);
+
+    if(shield.maxCharges>0 && this.shield<shield.maxCharges){
+      this.shieldRegenTimer -= dt;
+      if(this.shieldRegenTimer<=0){
+        this.shield++;
+        this.shieldRegenTimer = shield.regenTime;
+      }
+    }
+
+    this.fireCooldown -= dt;
+    if(keys.has('Space') && this.fireCooldown<=0){
+      this.fireCooldown = wpn.cooldown;
+      const noseX = this.x + Math.sin(this.angle)*this.radius*1.4;
+      const noseY = this.y - Math.cos(this.angle)*this.radius*1.4;
+      bullets.push(new Bullet(noseX,noseY,this.angle,wpn.bulletSpeed,wpn.damage));
+      spawnParticles(noseX,noseY,'#4ff0ff',2,0.15,90);
+    }
+
+    this.missileCooldown -= dt;
+    if((keys.has('ShiftLeft')||keys.has('ShiftRight')) && missile.count>0 && this.missileCooldown<=0){
+      this.missileCooldown = missile.cooldown;
+      const offsets = missile.count>1 ? [-0.12,0.12] : [0];
+      for(const off of offsets){
+        const a = this.angle+off;
+        const noseX = this.x + Math.sin(a)*this.radius*1.4;
+        const noseY = this.y - Math.cos(a)*this.radius*1.4;
+        missiles.push(new Missile(noseX,noseY,a,missile.damage,missile.splash));
+      }
+      spawnParticles(this.x,this.y,'#ffb84d',8,0.25,140);
+    }
+  }
+  hit(){
+    if(this.invulnTimer>0 || !this.alive) return false;
+    this.invulnTimer = this.stats.hull.invuln;
+    if(this.shield>0){
+      this.shield--;
+      this.shieldRegenTimer = this.stats.shield.regenTime;
+      this.shieldFlash = 0.3;
+      shake(6);
+      spawnParticles(this.x,this.y,'#7fd7ff',16,0.4,180);
+      return true;
+    }
+    mission.lives -= 1;
+    shake(10);
+    spawnParticles(this.x,this.y,'#4ff0ff',18,0.5,200);
+    if(mission.lives<=0) this.alive=false;
+    return true;
+  }
+}
+
+/* ---------------------------- bullets ---------------------------- */
+class Bullet{
+  constructor(x,y,angle,speed,damage){
+    this.x=x; this.y=y;
+    this.vx=Math.sin(angle)*speed; this.vy=-Math.cos(angle)*speed;
+    this.damage=damage; this.radius=3; this.life=1.4;
+  }
+  update(dt){
+    this.x = wrap(this.x+this.vx*dt, canvas.width);
+    this.y = wrap(this.y+this.vy*dt, canvas.height);
+    this.life -= dt;
+  }
+}
+
+/* ---------------------------- missiles ---------------------------- */
+class Missile{
+  constructor(x,y,angle,damage,splash){
+    this.x=x; this.y=y; this.angle=angle;
+    this.vx=Math.sin(angle)*360; this.vy=-Math.cos(angle)*360;
+    this.damage=damage; this.splash=splash;
+    this.radius=5; this.life=1.8; this.exploded=false;
+  }
+  update(dt){
+    this.x = wrap(this.x+this.vx*dt, canvas.width);
+    this.y = wrap(this.y+this.vy*dt, canvas.height);
+    this.life -= dt;
+    if(Math.random()<0.6) spawnParticles(this.x,this.y,'#ffb84d',1,0.2,20);
+  }
+}
+function explodeMissile(m){
+  spawnParticles(m.x,m.y,'#ffb84d',24,0.6,220);
+  shake(8);
+  // snapshot: splash should only catch what existed at the moment of impact,
+  // not chunks that this same explosion spawns while it's iterating
+  const asteroidsAtImpact = asteroids.filter(a=>!a.dead);
+  for(const a of asteroidsAtImpact){
+    if(dist2(m,a) < (m.splash+a.radius)*(m.splash+a.radius)){
+      a.hp -= m.damage;
+      if(a.hp<=0){
+        a.dead=true;
+        mission.asteroidsDestroyed++;
+        spawnParticles(a.x,a.y,'#c9d6ea',10,0.4,160);
+        if(a.size>1){
+          for(let i=0;i<2;i++){
+            const na=new Asteroid(a.x+rand(-6,6), a.y+rand(-6,6), a.size-1);
+            na.vx += rand(-40,40); na.vy += rand(-40,40);
+            asteroids.push(na);
+          }
+        }
+      }
+    }
+  }
+  const enemiesAtImpact = enemies.filter(e=>!e.dead);
+  for(const e of enemiesAtImpact){
+    if(dist2(m,e) < (m.splash+e.radius)*(m.splash+e.radius)){
+      e.hp -= m.damage;
+      if(e.hp<=0){
+        e.dead=true;
+        mission.enemiesDestroyed++;
+        spawnParticles(e.x,e.y, e.elite?'#ff3d81':'#ff7fae',18,0.5,200);
+      }
+    }
+  }
+}
+
+/* ---------------------------- asteroids ---------------------------- */
+function makeAsteroidShape(){
+  const n = Math.floor(rand(8,12));
+  const pts=[];
+  for(let i=0;i<n;i++) pts.push({a:(i/n)*Math.PI*2, r:rand(0.75,1.15)});
+  return pts;
+}
+class Asteroid{
+  constructor(x,y,size){
+    this.x=x; this.y=y; this.size=size;
+    this.radius = size===3?42: size===2?26:14;
+    this.hp = size;
+    const speed = rand(24,60) + (3-size)*22;
+    const dir = rand(0,Math.PI*2);
+    this.vx=Math.cos(dir)*speed; this.vy=Math.sin(dir)*speed;
+    this.rot=rand(0,Math.PI*2); this.rotSpeed=rand(-1,1);
+    this.shape = makeAsteroidShape();
+    this.dead=false;
+  }
+  update(dt){
+    this.x = wrap(this.x+this.vx*dt, canvas.width);
+    this.y = wrap(this.y+this.vy*dt, canvas.height);
+    this.rot += this.rotSpeed*dt;
+  }
+}
+function spawnAsteroidAtEdge(){
+  const edge = Math.floor(rand(0,4));
+  let x,y;
+  if(edge===0){ x=rand(0,canvas.width); y=-40; }
+  else if(edge===1){ x=canvas.width+40; y=rand(0,canvas.height); }
+  else if(edge===2){ x=rand(0,canvas.width); y=canvas.height+40; }
+  else { x=-40; y=rand(0,canvas.height); }
+  const size = Math.random()<0.65 ? 3 : 2;
+  asteroids.push(new Asteroid(x,y,size));
+}
+
+/* ---------------------------- enemies ---------------------------- */
+class Enemy{
+  constructor(x,y,elite){
+    this.x=x; this.y=y; this.elite=!!elite;
+    this.radius = this.elite?24:18;
+    this.hp = this.elite?5:2;
+    this.speed = this.elite?150:95;
+    this.fireInterval = this.elite?0.8:1.5;
+    this.fireTimer = rand(0.4,this.fireInterval);
+    this.angle=0;
+    this.dead=false;
+  }
+  update(dt,target){
+    const dx=wrapDelta(this.x,target.x,canvas.width);
+    const dy=wrapDelta(this.y,target.y,canvas.height);
+    const d=Math.hypot(dx,dy)||1;
+    this.angle = Math.atan2(dx,-dy);
+    const desired=220;
+    let mx=0,my=0;
+    if(d>desired+40){ mx=dx/d; my=dy/d; }
+    else if(d<desired-40){ mx=-dx/d; my=-dy/d; }
+    this.x = wrap(this.x+mx*this.speed*dt, canvas.width);
+    this.y = wrap(this.y+my*this.speed*dt, canvas.height);
+
+    this.fireTimer -= dt;
+    if(this.fireTimer<=0 && d<560){
+      this.fireTimer = this.fireInterval*rand(0.85,1.15);
+      const spread=(Math.random()-0.5)*0.18;
+      enemyBullets.push(new Bullet(this.x,this.y,this.angle+spread,this.elite?380:300,1));
+    }
+  }
+}
+function spawnEnemyAtEdge(elite){
+  const edge = Math.floor(rand(0,4));
+  let x,y;
+  if(edge===0){ x=rand(0,canvas.width); y=-40; }
+  else if(edge===1){ x=canvas.width+40; y=rand(0,canvas.height); }
+  else if(edge===2){ x=rand(0,canvas.width); y=canvas.height+40; }
+  else { x=-40; y=rand(0,canvas.height); }
+  enemies.push(new Enemy(x,y,elite));
+}
+
+/* ---------------------------- particles ---------------------------- */
+class Particle{
+  constructor(x,y,color,speed,angle,life){
+    this.x=x; this.y=y; this.color=color;
+    this.vx=Math.cos(angle)*speed; this.vy=Math.sin(angle)*speed;
+    this.life=life; this.maxLife=life;
+  }
+  update(dt){
+    this.x+=this.vx*dt; this.y+=this.vy*dt;
+    this.vx*=0.94; this.vy*=0.94;
+    this.life-=dt;
+  }
+}
+function spawnParticles(x,y,color,count,lifeBase,speedBase){
+  lifeBase = lifeBase||0.5; speedBase = speedBase||140;
+  for(let i=0;i<count;i++){
+    const a=rand(0,Math.PI*2);
+    particles.push(new Particle(x,y,color,rand(speedBase*0.3,speedBase),a,rand(lifeBase*0.5,lifeBase)));
+  }
+}
+
+/* ---------------------------- ship instance ---------------------------- */
+const ship = new Ship();
+
+/* ---------------------------- mission lifecycle ---------------------------- */
+function objectiveText(m){
+  if(m.type==='asteroids') return `Destroy ${m.target} asteroids`;
+  if(m.type==='enemies') return `Destroy ${m.target} enemy ships${m.timeLimit?` within ${m.timeLimit}s`:''}`;
+  if(m.type==='survive') return `Survive ${m.target} seconds`;
+}
+function objectiveLabel(m){
+  if(m.type==='asteroids') return `ASTEROIDS DESTROYED — ${mission.asteroidsDestroyed}/${m.target}`;
+  if(m.type==='enemies') return `ENEMIES DESTROYED — ${mission.enemiesDestroyed}/${m.target}`;
+  if(m.type==='survive') return `SURVIVE — ${Math.min(mission.timeElapsed,m.target).toFixed(0)}/${m.target}s`;
+}
+
+function launchMission(id){
+  const m = MISSIONS.find(mm=>mm.id===id);
+  bullets.length=0; enemyBullets.length=0; missiles.length=0; asteroids.length=0; enemies.length=0; particles.length=0;
+  ship.reset();
+  const hullLvl = UPGRADE_TRACKS.hull.levels[game.upgrades.hull];
+  mission = {
+    id:m.id, type:m.type, target:m.target, timeLimit:m.timeLimit, spawn:m.spawn,
+    timeElapsed:0, asteroidsDestroyed:0, enemiesDestroyed:0,
+    asteroidTimer:rand(0.4,1.0), enemyTimer:rand(0.8,1.6),
+    lives:hullLvl.maxLives, ended:false,
+  };
+  game.state='mission';
+  showScreen(null);
+  updateHUD();
+}
+
+function endMission(success, reason){
+  if(!mission || mission.ended) return;
+  mission.ended = true;
+  const m = MISSIONS.find(mm=>mm.id===mission.id);
+  let creditsEarned=0;
+  if(success){
+    creditsEarned = m.reward;
+    game.credits += creditsEarned;
+    game.completedMissions.add(m.id);
+    const idx = MISSIONS.findIndex(mm=>mm.id===m.id);
+    if(idx+1 < MISSIONS.length) game.unlockedMissionIndex = Math.max(game.unlockedMissionIndex, idx+1);
+  }
+  game.lastEndResult = {success, missionId:m.id, missionName:m.name, creditsEarned, reason};
+  game.state='end';
+  showScreen('end');
+  renderEndScreen();
+}
+
+function handleEscape(){
+  if(game.state==='mission'){
+    endMission(false,'aborted');
+  }
+}
+
+function updateMission(dt){
+  mission.timeElapsed += dt;
+
+  if(mission.timeLimit && mission.type!=='survive' && mission.timeElapsed>=mission.timeLimit){
+    endMission(false,'time'); return;
+  }
+
+  ship.update(dt);
+  if(!ship.alive){ endMission(false,'destroyed'); return; }
+
+  let intervalScale=1;
+  if(mission.spawn.ramp) intervalScale = Math.max(0.45, 1 - mission.timeElapsed/180);
+
+  if(mission.spawn.asteroidInterval!==Infinity){
+    mission.asteroidTimer -= dt;
+    if(mission.asteroidTimer<=0 && asteroids.length<26){
+      spawnAsteroidAtEdge();
+      mission.asteroidTimer = mission.spawn.asteroidInterval*intervalScale*rand(0.8,1.2);
+    }
+  }
+  if(mission.spawn.enemyInterval!==Infinity){
+    mission.enemyTimer -= dt;
+    if(mission.enemyTimer<=0 && enemies.length<8){
+      const elite = Math.random() < (mission.spawn.eliteChance||0);
+      spawnEnemyAtEdge(elite);
+      mission.enemyTimer = mission.spawn.enemyInterval*intervalScale*rand(0.8,1.2);
+    }
+  }
+
+  for(const b of bullets) b.update(dt);
+  for(const b of enemyBullets) b.update(dt);
+  for(const m of missiles) m.update(dt);
+  for(const a of asteroids) a.update(dt);
+  for(const e of enemies) e.update(dt,ship);
+  for(const p of particles) p.update(dt);
+
+  // player bullets vs asteroids
+  for(const b of bullets){
+    if(b.life<=0) continue;
+    for(const a of asteroids){
+      if(a.dead) continue;
+      if(dist2(b,a) < (b.radius+a.radius)*(b.radius+a.radius)){
+        a.hp -= b.damage; b.life=0;
+        spawnParticles(b.x,b.y,'#9fb3d9',6,0.3,120);
+        if(a.hp<=0){
+          a.dead=true;
+          mission.asteroidsDestroyed++;
+          spawnParticles(a.x,a.y,'#c9d6ea',14,0.5,180);
+          if(a.size>1){
+            for(let i=0;i<2;i++){
+              const na=new Asteroid(a.x+rand(-6,6), a.y+rand(-6,6), a.size-1);
+              na.vx += rand(-40,40); na.vy += rand(-40,40);
+              asteroids.push(na);
+            }
+          }
+        }
+        break;
+      }
+    }
+  }
+  // player bullets vs enemies
+  for(const b of bullets){
+    if(b.life<=0) continue;
+    for(const e of enemies){
+      if(e.dead) continue;
+      if(dist2(b,e) < (b.radius+e.radius)*(b.radius+e.radius)){
+        e.hp -= b.damage; b.life=0;
+        spawnParticles(b.x,b.y,'#ff9fc3',6,0.3,120);
+        if(e.hp<=0){
+          e.dead=true;
+          mission.enemiesDestroyed++;
+          spawnParticles(e.x,e.y, e.elite?'#ff3d81':'#ff7fae',20,0.6,200);
+          shake(e.elite?6:3);
+        }
+        break;
+      }
+    }
+  }
+  // enemy bullets vs player
+  for(const b of enemyBullets){
+    if(b.life<=0) continue;
+    if(dist2(b,ship) < (b.radius+ship.radius)*(b.radius+ship.radius)){
+      b.life=0; ship.hit();
+    }
+  }
+  // asteroids vs player
+  for(const a of asteroids){
+    if(a.dead) continue;
+    if(dist2(a,ship) < (a.radius+ship.radius)*(a.radius+ship.radius)){
+      a.dead=true;
+      spawnParticles(a.x,a.y,'#c9d6ea',14,0.5,180);
+      ship.hit();
+    }
+  }
+  // enemies vs player (contact)
+  for(const e of enemies){
+    if(e.dead) continue;
+    if(dist2(e,ship) < (e.radius+ship.radius)*(e.radius+ship.radius)){
+      e.dead=true;
+      mission.enemiesDestroyed++;
+      spawnParticles(e.x,e.y,'#ff3d81',20,0.6,200);
+      ship.hit();
+    }
+  }
+  // missiles vs asteroids/enemies (detonate on contact or expiry)
+  for(const m of missiles){
+    if(m.exploded) continue;
+    let hit=false;
+    for(const a of asteroids){ if(!a.dead && dist2(m,a) < (m.radius+a.radius)*(m.radius+a.radius)){ hit=true; break; } }
+    if(!hit) for(const e of enemies){ if(!e.dead && dist2(m,e) < (m.radius+e.radius)*(m.radius+e.radius)){ hit=true; break; } }
+    if(hit || m.life<=0){ m.exploded=true; explodeMissile(m); }
+  }
+
+  filterInPlace(bullets, b=>b.life>0);
+  filterInPlace(enemyBullets, b=>b.life>0);
+  filterInPlace(missiles, m=>!m.exploded);
+  filterInPlace(asteroids, a=>!a.dead);
+  filterInPlace(enemies, e=>!e.dead);
+  filterInPlace(particles, p=>p.life>0);
+
+  if(mission.ended) return;
+  if(mission.type==='asteroids' && mission.asteroidsDestroyed>=mission.target){ endMission(true); return; }
+  if(mission.type==='enemies' && mission.enemiesDestroyed>=mission.target){ endMission(true); return; }
+  if(mission.type==='survive' && mission.timeElapsed>=mission.target){ endMission(true); return; }
+
+  updateHUD();
+}
+
+/* ---------------------------- rendering ---------------------------- */
+function drawShip(s){
+  ctx.save();
+  ctx.translate(s.x,s.y);
+  ctx.rotate(s.angle);
+  const flashing = s.invulnTimer>0 && Math.floor(s.invulnTimer*10)%2===0;
+  ctx.globalAlpha = flashing?0.35:1;
+  ctx.strokeStyle='#4ff0ff';
+  ctx.shadowColor='#4ff0ff'; ctx.shadowBlur=12;
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(0,-16);
+  ctx.lineTo(10,12);
+  ctx.lineTo(0,6);
+  ctx.lineTo(-10,12);
+  ctx.closePath();
+  ctx.stroke();
+  if(s.thrusting){
+    ctx.strokeStyle='#ffb84d'; ctx.shadowColor='#ffb84d';
+    ctx.beginPath();
+    ctx.moveTo(-5,10); ctx.lineTo(0,10+rand(8,18)); ctx.lineTo(5,10);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const shieldLvl = s.stats.shield;
+  if(shieldLvl.maxCharges>0 && s.shield>0){
+    ctx.save();
+    ctx.translate(s.x,s.y);
+    const flashBoost = s.shieldFlash>0 ? s.shieldFlash/0.3 : 0;
+    ctx.globalAlpha = 0.2 + 0.5*(s.shield/shieldLvl.maxCharges) + flashBoost*0.4;
+    ctx.strokeStyle='#7fd7ff';
+    ctx.shadowColor='#7fd7ff'; ctx.shadowBlur=14;
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.arc(0,0,22,0,Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+function drawMissile(m){
+  ctx.save();
+  ctx.translate(m.x,m.y); ctx.rotate(m.angle);
+  ctx.strokeStyle='#ffb84d'; ctx.shadowColor='#ffb84d'; ctx.shadowBlur=10; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(0,-9); ctx.lineTo(4,7); ctx.lineTo(0,4); ctx.lineTo(-4,7);
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+function drawAsteroid(a){
+  ctx.save();
+  ctx.translate(a.x,a.y); ctx.rotate(a.rot);
+  ctx.strokeStyle='#9fb3d9'; ctx.shadowColor='#4ff0ff'; ctx.shadowBlur=6; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  a.shape.forEach((p,i)=>{
+    const x=Math.cos(p.a)*p.r*a.radius, y=Math.sin(p.a)*p.r*a.radius;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+function drawEnemy(e){
+  ctx.save();
+  ctx.translate(e.x,e.y); ctx.rotate(e.angle);
+  ctx.strokeStyle = e.elite?'#ff3d81':'#ff7fae';
+  ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = e.elite?14:8;
+  ctx.lineWidth = e.elite?2.5:2;
+  const w = e.elite?16:11;
+  ctx.beginPath();
+  ctx.moveTo(0,14); ctx.lineTo(w,-12); ctx.lineTo(0,-4); ctx.lineTo(-w,-12);
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+function drawBullet(b,color){
+  ctx.save();
+  ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.arc(b.x,b.y,b.radius,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawParticle(p){
+  ctx.save();
+  ctx.globalAlpha = Math.max(0,p.life/p.maxLife);
+  ctx.fillStyle=p.color;
+  ctx.beginPath(); ctx.arc(p.x,p.y,1.6,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function render(dt){
+  ctx.fillStyle='#05070d';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawStars(dt);
+
+  if(game.state==='mission' && mission){
+    ctx.save();
+    if(shakeTime>0){
+      const s = shakeMag*(shakeTime/0.3);
+      ctx.translate(rand(-s,s), rand(-s,s));
+    }
+    for(const a of asteroids) drawAsteroid(a);
+    for(const e of enemies) drawEnemy(e);
+    for(const b of bullets) drawBullet(b,'#4ff0ff');
+    for(const b of enemyBullets) drawBullet(b,'#ff3d81');
+    for(const m of missiles) drawMissile(m);
+    for(const p of particles) drawParticle(p);
+    if(ship.alive) drawShip(ship);
+    ctx.restore();
+  }
+}
+
+/* ---------------------------- HUD ---------------------------- */
+function updateHUD(){
+  if(!mission) return;
+  const m = MISSIONS.find(mm=>mm.id===mission.id);
+  document.getElementById('hudObjective').textContent = objectiveLabel(m);
+  const maxLives = UPGRADE_TRACKS.hull.levels[game.upgrades.hull].maxLives;
+  document.getElementById('hudLives').innerHTML = Array.from({length:maxLives}).map((_,i)=>
+    `<span class="life-icon ${i<mission.lives?'':'spent'}">▲</span>`).join('');
+
+  const shieldLvl = UPGRADE_TRACKS.shield.levels[game.upgrades.shield];
+  const shieldRow = document.getElementById('hudShield');
+  if(shieldLvl.maxCharges>0){
+    shieldRow.classList.remove('hidden');
+    shieldRow.innerHTML = Array.from({length:shieldLvl.maxCharges}).map((_,i)=>
+      `<span class="shield-icon ${i<ship.shield?'':'spent'}">◆</span>`).join('');
+  } else {
+    shieldRow.classList.add('hidden');
+  }
+
+  const missileLvl = UPGRADE_TRACKS.missiles.levels[game.upgrades.missiles];
+  const missileRow = document.getElementById('hudMissile');
+  if(missileLvl.count>0){
+    missileRow.classList.remove('hidden');
+    const ready = ship.missileCooldown<=0;
+    missileRow.textContent = ready ? 'MISSILES READY' : `MISSILE ${Math.ceil(ship.missileCooldown)}s`;
+    missileRow.classList.toggle('ready', ready);
+  } else {
+    missileRow.classList.add('hidden');
+  }
+  document.getElementById('hudHint').textContent = missileLvl.count>0
+    ? 'W THRUST · A/D ROTATE · SPACE FIRE · SHIFT MISSILE · ESC ABORT'
+    : 'W THRUST · A/D ROTATE · SPACE FIRE · ESC ABORT';
+
+  const timerEl = document.getElementById('hudTimer');
+  if(m.type==='survive'){
+    timerEl.textContent = `${Math.max(0,Math.ceil(m.target-mission.timeElapsed))}s`;
+    timerEl.classList.remove('hidden');
+  } else if(m.timeLimit){
+    timerEl.textContent = `${Math.max(0,Math.ceil(m.timeLimit-mission.timeElapsed))}s`;
+    timerEl.classList.remove('hidden');
+  } else {
+    timerEl.classList.add('hidden');
+  }
+}
+
+/* ---------------------------- screens ---------------------------- */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  if(id) document.getElementById('screen-'+id).classList.add('active');
+  document.getElementById('hud').classList.toggle('hidden', game.state!=='mission');
+}
+
+function enterHangar(){
+  game.state='hangar';
+  showScreen('hangar');
+  renderHangar();
+}
+
+function renderHangar(){
+  document.getElementById('hangarCredits').textContent = `${game.credits} CR`;
+  renderMissionList();
+  renderMissionDetail();
+  renderUpgrades();
+  drawBlueprint();
+}
+
+function renderMissionList(){
+  const container = document.getElementById('missionList');
+  container.innerHTML = MISSIONS.map((m,i)=>{
+    const locked = i>game.unlockedMissionIndex;
+    const completed = game.completedMissions.has(m.id);
+    const selected = m.id===game.selectedMissionId;
+    return `<button class="mission-item ${selected?'selected':''} ${locked?'locked':''}" data-id="${m.id}" ${locked?'disabled':''}>
+      <span class="mission-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="mission-name">${m.name}</span>
+      <span class="mission-status">${completed?'✓ CLEARED':(locked?'LOCKED':'')}</span>
+    </button>`;
+  }).join('');
+  container.querySelectorAll('.mission-item').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      game.selectedMissionId = btn.dataset.id;
+      renderHangar();
+    });
+  });
+}
+
+function renderMissionDetail(){
+  const m = MISSIONS.find(mm=>mm.id===game.selectedMissionId) || MISSIONS[0];
+  const idx = MISSIONS.findIndex(mm=>mm.id===m.id);
+  const locked = idx>game.unlockedMissionIndex;
+  const el = document.getElementById('missionDetail');
+  el.innerHTML = `
+    <div class="detail-name">${m.name}</div>
+    <div class="detail-brief">${m.brief}</div>
+    <div class="detail-obj">OBJECTIVE — ${objectiveText(m)}</div>
+    <div class="detail-reward">REWARD — ${m.reward} CR</div>
+    <button id="launchBtn" class="btn btn-primary" ${locked?'disabled':''}>${locked?'LOCKED':'LAUNCH MISSION'}</button>
+  `;
+  if(!locked){
+    document.getElementById('launchBtn').addEventListener('click', ()=> launchMission(m.id));
+  }
+}
+
+function renderUpgrades(){
+  const grid = document.getElementById('upgradeGrid');
+  grid.innerHTML = Object.keys(UPGRADE_TRACKS).map(key=>{
+    const track = UPGRADE_TRACKS[key];
+    const lvl = game.upgrades[key];
+    const maxed = lvl>=track.levels.length-1;
+    const cur = track.levels[lvl];
+    const next = maxed?null:track.levels[lvl+1];
+    const pips = track.levels.map((_,i)=>`<span class="pip ${i<=lvl?'filled':''}"></span>`).join('');
+    return `<div class="upgrade-card">
+      <div class="upgrade-name">${track.name}</div>
+      <div class="pip-row">${pips}</div>
+      <div class="upgrade-stat">${track.desc(cur)}</div>
+      ${maxed
+        ? `<div class="upgrade-next">MAX LEVEL</div>`
+        : `<div class="upgrade-next">Next: ${track.desc(next)} — <span class="upgrade-cost">${next.cost} CR</span></div>
+           <button class="btn btn-small" data-track="${key}" ${game.credits<next.cost?'disabled':''}>Upgrade</button>`
+      }
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('button[data-track]').forEach(btn=>{
+    btn.addEventListener('click', ()=> buyUpgrade(btn.dataset.track));
+  });
+}
+
+function buyUpgrade(track){
+  const cur = game.upgrades[track];
+  const levels = UPGRADE_TRACKS[track].levels;
+  if(cur+1>=levels.length) return;
+  const cost = levels[cur+1].cost;
+  if(game.credits<cost) return;
+  game.credits -= cost;
+  game.upgrades[track] = cur+1;
+  renderHangar();
+}
+
+function drawBlueprint(){
+  const c = document.getElementById('blueprintCanvas');
+  const bctx = c.getContext('2d');
+  const w=c.width, h=c.height;
+  bctx.clearRect(0,0,w,h);
+
+  bctx.strokeStyle='rgba(79,240,255,0.06)'; bctx.lineWidth=1;
+  for(let gx=0; gx<w; gx+=20){ bctx.beginPath(); bctx.moveTo(gx,0); bctx.lineTo(gx,h); bctx.stroke(); }
+  for(let gy=0; gy<h; gy+=20){ bctx.beginPath(); bctx.moveTo(0,gy); bctx.lineTo(w,gy); bctx.stroke(); }
+
+  const cx=w/2, cy=h/2+6;
+  const hullLvl=game.upgrades.hull, engLvl=game.upgrades.engine, wpnLvl=game.upgrades.weapon;
+
+  const engR = 16+engLvl*7;
+  const grad = bctx.createRadialGradient(cx,cy+46,2,cx,cy+46,engR);
+  grad.addColorStop(0,'rgba(255,184,77,0.9)');
+  grad.addColorStop(1,'rgba(255,184,77,0)');
+  bctx.fillStyle=grad;
+  bctx.beginPath(); bctx.arc(cx,cy+46,engR,0,Math.PI*2); bctx.fill();
+
+  bctx.save();
+  bctx.shadowColor='#4ff0ff'; bctx.shadowBlur=10+hullLvl*3;
+  bctx.strokeStyle='#4ff0ff'; bctx.lineWidth=2+hullLvl*0.7;
+  bctx.beginPath();
+  bctx.moveTo(cx,cy-56);
+  bctx.lineTo(cx+34,cy+42);
+  bctx.lineTo(cx+14,cy+30);
+  bctx.lineTo(cx-14,cy+30);
+  bctx.lineTo(cx-34,cy+42);
+  bctx.closePath();
+  bctx.stroke();
+  bctx.restore();
+
+  for(let i=0;i<hullLvl;i++){
+    bctx.strokeStyle=`rgba(79,240,255,${0.25+i*0.15})`; bctx.lineWidth=1.5;
+    bctx.beginPath();
+    bctx.arc(cx,cy-2,46+i*10,Math.PI*0.15,Math.PI*0.85);
+    bctx.stroke();
+  }
+
+  const wingSpots=[[cx-34,cy+42],[cx+34,cy+42],[cx-14,cy+30],[cx+14,cy+30]];
+  for(let i=0;i<wingSpots.length;i++){
+    const lit = i<=wpnLvl;
+    bctx.fillStyle = lit?'#ff3d81':'rgba(255,61,129,0.15)';
+    bctx.shadowColor='#ff3d81'; bctx.shadowBlur = lit?8:0;
+    bctx.beginPath(); bctx.arc(wingSpots[i][0],wingSpots[i][1],4,0,Math.PI*2); bctx.fill();
+  }
+  bctx.shadowBlur=0;
+
+  const shieldTrack = UPGRADE_TRACKS.shield.levels[game.upgrades.shield];
+  if(shieldTrack.maxCharges>0){
+    bctx.save();
+    bctx.strokeStyle='rgba(127,215,255,0.5)';
+    bctx.shadowColor='#7fd7ff'; bctx.shadowBlur=10;
+    bctx.lineWidth=1.5;
+    bctx.beginPath();
+    bctx.arc(cx,cy-2,58,0,Math.PI*2);
+    bctx.stroke();
+    bctx.restore();
+  }
+
+  const missileTrack = UPGRADE_TRACKS.missiles.levels[game.upgrades.missiles];
+  if(missileTrack.count>0){
+    const podSpots = missileTrack.count>1 ? [[cx-22,cy+16],[cx+22,cy+16]] : [[cx,cy+20]];
+    bctx.fillStyle='#ffb84d'; bctx.shadowColor='#ffb84d'; bctx.shadowBlur=8;
+    podSpots.forEach(([px,py])=>{ bctx.fillRect(px-4,py-3,8,6); });
+    bctx.shadowBlur=0;
+  }
+}
+
+function renderEndScreen(){
+  const r = game.lastEndResult;
+  const el = document.getElementById('screen-end');
+  let reasonText = 'MISSION COMPLETE';
+  if(!r.success){
+    if(r.reason==='time') reasonText='TIME EXPIRED';
+    else if(r.reason==='aborted') reasonText='MISSION ABORTED';
+    else reasonText='SHIP DESTROYED';
+  }
+  const titleEl = el.querySelector('.end-title');
+  titleEl.textContent = reasonText;
+  titleEl.className = 'end-title ' + (r.success?'success':'fail');
+  el.querySelector('.end-mission').textContent = r.missionName;
+  el.querySelector('.end-credits').textContent = r.success ? `+${r.creditsEarned} CR EARNED` : 'NO REWARD';
+}
+
+/* ---------------------------- boot / loop ---------------------------- */
+document.getElementById('startBtn').addEventListener('click', enterHangar);
+document.getElementById('endHangarBtn').addEventListener('click', enterHangar);
+
+let lastTime=null;
+function loop(t){
+  if(lastTime===null) lastTime=t;
+  let dt=(t-lastTime)/1000; lastTime=t;
+  dt=Math.min(dt,0.05);
+
+  if(shakeTime>0) shakeTime=Math.max(0,shakeTime-dt);
+  if(game.state==='mission' && mission && !mission.ended) updateMission(dt);
+  render(dt);
+
+  requestAnimationFrame(loop);
+}
+
+resize();
+showScreen('title');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
