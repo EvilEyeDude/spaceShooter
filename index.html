@@ -352,12 +352,36 @@ window.addEventListener('resize', resize);
 
 /* ---------------------------- input ---------------------------- */
 const keys = new Set();
+
+// Maps alternate keys to the "canonical" game key they should behave like.
+// This lets the arrow keys drive the ship exactly like WASD without touching
+// any of the movement/firing logic below (which only ever checks for
+// KeyW/KeyA/KeyD/etc). To support another alternate control scheme, just add
+// another entry here: 'RealCode': 'CanonicalCode'.
+const KEY_ALIASES = {
+  ArrowUp:    'KeyW', // thrust forward
+  ArrowLeft:  'KeyA', // rotate left
+  ArrowRight: 'KeyD', // rotate right
+  ArrowDown:  'KeyS', // reserved for reverse thrust, unused currently but mapped for consistency
+};
+
+// Keys that should stop the browser's default behavior (e.g. page scrolling
+// on arrow keys, or scrolling on Space) while the game is capturing input.
+const PREVENT_DEFAULT_CODES = [
+  'KeyW','KeyA','KeyD','Space','ShiftLeft','ShiftRight',
+  'ArrowUp','ArrowLeft','ArrowRight','ArrowDown',
+];
+
 window.addEventListener('keydown', e=>{
-  if(['KeyW','KeyA','KeyD','Space','ShiftLeft','ShiftRight'].includes(e.code)) e.preventDefault();
+  if(PREVENT_DEFAULT_CODES.includes(e.code)) e.preventDefault();
   keys.add(e.code);
+  if(KEY_ALIASES[e.code]) keys.add(KEY_ALIASES[e.code]); // also register the canonical key
   if(e.code==='Escape') handleEscape();
 });
-window.addEventListener('keyup', e=> keys.delete(e.code));
+window.addEventListener('keyup', e=>{
+  keys.delete(e.code);
+  if(KEY_ALIASES[e.code]) keys.delete(KEY_ALIASES[e.code]); // release the canonical key too
+});
 
 /* ---------------------------- utility ---------------------------- */
 function rand(a,b){ return a + Math.random()*(b-a); }
