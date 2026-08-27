@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Void Runner</title>
+<title>Guardian of the Milky Way</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -79,13 +79,16 @@
   .btn-small{padding:8px 14px;font-size:11px;letter-spacing:1.5px;}
 
   /* ---------- title screen ---------- */
-  #screen-title{flex-direction:column;gap:26px;text-align:center;}
+  #screen-title{flex-direction:column;gap:26px;text-align:center;padding:0 24px;}
   .title-logo{
-    font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(42px,8vw,84px);
-    letter-spacing:8px;color:var(--cyan);margin:0;
+    /* Longer titles wrap to 2-3 lines on narrow screens — font-size floor and letter-spacing
+       are both smaller than the old single-word logo used, and line-height/margin keep multi-line
+       titles from colliding with the subtitle below (see .title-sub). Tune freely per-title. */
+    font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,7vw,76px);
+    letter-spacing:4px;line-height:1.15;color:var(--cyan);margin:0;
     text-shadow:0 0 8px rgba(79,240,255,0.8), 0 0 24px rgba(79,240,255,0.5), 0 0 60px rgba(79,240,255,0.3);
   }
-  .title-sub{color:var(--text-dim);letter-spacing:4px;font-size:14px;text-transform:uppercase;margin-top:-14px;}
+  .title-sub{color:var(--text-dim);letter-spacing:4px;font-size:14px;text-transform:uppercase;margin-top:4px;}
   .keycap-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
   .keycap-item{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;letter-spacing:1px;}
   .keycap{
@@ -94,6 +97,27 @@
     padding:6px 10px;min-width:14px;text-align:center;
     clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
   }
+
+  /* ---------- auth screen ---------- */
+  #screen-auth{flex-direction:column;text-align:center;padding:0 24px;}
+  .auth-panel{width:100%;max-width:380px;padding:30px;text-align:left;}
+  .auth-title{font-size:18px;letter-spacing:4px;color:var(--cyan);margin:0 0 6px;}
+  .auth-sub{color:var(--text-dim);font-size:13px;margin-bottom:20px;line-height:1.5;}
+  .auth-field{margin-bottom:14px;}
+  .auth-field label{display:block;font-size:11px;letter-spacing:2px;color:var(--text-faint);text-transform:uppercase;margin-bottom:6px;}
+  .auth-field input{
+    width:100%;background:var(--panel-alt);border:1px solid var(--line-bright);color:var(--text);
+    font-family:'Rajdhani',sans-serif;font-size:15px;padding:11px 12px;
+    clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  }
+  .auth-field input:focus{outline:none;border-color:var(--cyan);}
+  .auth-actions{display:flex;gap:10px;margin-top:20px;}
+  .auth-actions .btn{flex:1;}
+  .auth-msg{margin-top:14px;font-size:13px;min-height:18px;line-height:1.4;}
+  .auth-msg.error{color:var(--magenta);}
+  .auth-msg.ok{color:var(--green);}
+  .auth-guest{margin-top:18px;font-size:12px;color:var(--text-faint);text-align:center;}
+  .auth-guest a{color:var(--text-dim);cursor:pointer;text-decoration:underline;}
 
   /* ---------- hangar screen ---------- */
   #screen-hangar{align-items:stretch;justify-content:stretch;}
@@ -105,6 +129,8 @@
     border:1px solid rgba(255,184,77,0.4);background:rgba(255,184,77,0.06);
     padding:9px 18px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);
   }
+  .hangar-header-right{display:flex;align-items:center;gap:12px;}
+  .pilot-tag{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;}
   .hangar-body{flex:1;display:grid;grid-template-columns:320px 1fr;gap:16px;min-height:0;}
   .col{display:flex;flex-direction:column;gap:16px;min-height:0;}
 
@@ -209,9 +235,30 @@
 
 <div id="ui">
 
-  <section id="screen-title" class="screen active">
+  <section id="screen-auth" class="screen">
+    <div class="panel auth-panel">
+      <h2 class="auth-title">PILOT LOGIN</h2>
+      <div class="auth-sub">Sign in to save your credits, upgrades, and mission progress across sessions.</div>
+      <div class="auth-field">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" autocomplete="current-password" placeholder="At least 6 characters">
+      </div>
+      <div class="auth-actions">
+        <button id="authSignInBtn" class="btn btn-primary">Sign In</button>
+        <button id="authSignUpBtn" class="btn">Create Account</button>
+      </div>
+      <div class="auth-msg" id="authMsg"></div>
+      <div class="auth-guest">or <a id="authGuestLink">play as guest — progress won't be saved</a></div>
+    </div>
+  </section>
+
+  <section id="screen-title" class="screen">
     <div>
-      <h1 class="title-logo">VOID RUNNER</h1>
+      <h1 class="title-logo">GUARDIAN OF THE MILKY WAY</h1>
       <div class="title-sub">Fly missions · earn credits · upgrade your ship</div>
       <div class="keycap-row">
         <div class="keycap-item"><span class="keycap">W</span> Thrust</div>
@@ -230,7 +277,10 @@
     <div class="hangar-wrap">
       <div class="hangar-header">
         <h2 class="hangar-title">HANGAR</h2>
-        <div class="credits-pill" id="hangarCredits">0 CR</div>
+        <div class="hangar-header-right">
+          <div class="pilot-tag" id="pilotTag"></div>
+          <div class="credits-pill" id="hangarCredits">0 CR</div>
+        </div>
       </div>
       <div class="hangar-body">
         <div class="col">
@@ -279,9 +329,14 @@
   <div class="hud-hint" id="hudHint">W THRUST · A/D ROTATE · SPACE FIRE · ESC ABORT</div>
 </div>
 
+<!-- Supabase client library — only used for the optional cloud-save/account system below.
+     If you remove this tag and leave SUPABASE_URL/SUPABASE_KEY unset, the game runs exactly
+     as before with no accounts and no network calls. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 /* =====================================================================
-   VOID RUNNER — self-contained HTML5 canvas game
+   GUARDIAN OF THE MILKY WAY — self-contained HTML5 canvas game
    ===================================================================== */
 
 /* ---------------------------- canvas / dpr ---------------------------- */
@@ -298,7 +353,7 @@ window.addEventListener('resize', resize);
 /* ---------------------------- input ---------------------------- */
 const keys = new Set();
 window.addEventListener('keydown', e=>{
-  if(['KeyW','ArrowUp','KeyA','ArrowLeft','KeyD','ArrowRight','Space','ShiftLeft','ShiftRight'].includes(e.code)) e.preventDefault();
+  if(['KeyW','KeyA','KeyD','Space','ShiftLeft','ShiftRight'].includes(e.code)) e.preventDefault();
   keys.add(e.code);
   if(e.code==='Escape') handleEscape();
 });
@@ -320,7 +375,7 @@ const UPGRADE_TRACKS = {
       {cooldown:0.30, bulletSpeed:560, damage:1, cost:120},
       {cooldown:0.23, bulletSpeed:600, damage:2, cost:220},
       {cooldown:0.16, bulletSpeed:650, damage:2, cost:380},
-      {cooldown:0.10, bulletSpeed:690, damage:2, cost:450},
+      {cooldown:0.05, bulletSpeed:800, damage:3, cost:10000},
     ],
     desc:l=>`Fire rate ${(1/l.cooldown).toFixed(1)}/s · Damage ${l.damage}`,
   },
@@ -331,6 +386,7 @@ const UPGRADE_TRACKS = {
       {thrust:270, maxSpeed:340, turnSpeed:3.6, cost:120},
       {thrust:310, maxSpeed:380, turnSpeed:4.0, cost:220},
       {thrust:360, maxSpeed:430, turnSpeed:4.5, cost:380},
+      {thrust:500, maxSpeed:500, turnSpeed:4.5, cost:10000},
     ],
     desc:l=>`Thrust ${l.thrust} · Max speed ${l.maxSpeed}`,
   },
@@ -341,6 +397,7 @@ const UPGRADE_TRACKS = {
       {maxLives:4, invuln:1.8, cost:150},
       {maxLives:5, invuln:2.0, cost:260},
       {maxLives:6, invuln:2.2, cost:400},
+      {maxLives:10, invuln:2.5, cost:10000},
     ],
     desc:l=>`Lives ${l.maxLives} · Invuln ${l.invuln.toFixed(1)}s`,
   },
@@ -351,6 +408,7 @@ const UPGRADE_TRACKS = {
       {maxCharges:1, regenTime:6.5, cost:180},
       {maxCharges:2, regenTime:5.5, cost:320},
       {maxCharges:3, regenTime:4.5, cost:480},
+      {maxCharges:5, regenTime:2, cost:10000},
     ],
     desc:l=> l.maxCharges===0 ? 'No shield generator installed' : `Charges ${l.maxCharges} · Regen ${l.regenTime.toFixed(1)}s`,
   },
@@ -361,6 +419,7 @@ const UPGRADE_TRACKS = {
       {count:1, cooldown:3.0, damage:4, splash:42, cost:200},
       {count:1, cooldown:2.2, damage:5, splash:56, cost:340},
       {count:2, cooldown:1.8, damage:6, splash:70, cost:520},
+      {count:5, cooldown:1.2, damage:10, splash:80, cost:10000},
     ],
     desc:l=> l.count===0 ? 'No missile rack installed' : `${l.count}× rack · ${l.damage} dmg · ${l.splash}px splash`,
   },
@@ -373,11 +432,36 @@ const MISSIONS = [
   {id:'m4', name:'Convoy Buster',  brief:'Destroy 6 enemy ships before the convoy scatters.',                type:'enemies',    target:6,  timeLimit:90, spawn:{asteroidInterval:2.6, enemyInterval:2.8}, reward:250},
   {id:'m5', name:'Endurance',      brief:'Hold the line for 90 seconds against escalating waves.',           type:'survive',    target:90, spawn:{asteroidInterval:1.1, enemyInterval:3.4, ramp:true}, reward:300},
   {id:'m6', name:'Last Stand',     brief:'Destroy 10 enemy ships. Elites are inbound. This is the big one.', type:'enemies',    target:10, spawn:{asteroidInterval:1.0, enemyInterval:2.0, eliteChance:0.3, ramp:true}, reward:500},
+
+  // ---- extended roster: mostly the same three types at higher difficulty,
+  // plus two brand-new mission types ('boss' and 'combo') sprinkled in ----
+
+  {id:'m7', name:'Pursuit',        brief:'Enemy scouts are running for the jump line — cut them off.',     type:'enemies',    target:8,  timeLimit:100, spawn:{asteroidInterval:2.4, enemyInterval:3.2, eliteChance:0.12}, reward:320},
+
+  // NEW mission type: 'boss'. A single tough, named enemy instead of a kill quota.
+  // bossConfig fully controls its stats — tune per-mission without touching any code below.
+  {id:'m8', name:'The Dreadnought', brief:'A capital-class warship has entered the sector. Bring it down.', type:'boss', bossName:'Dreadnought',
+    spawn:{asteroidInterval:3.5, enemyInterval:Infinity},
+    bossConfig:{radius:38, hp:75, speed:110, fireInterval:0.55, bulletSpeed:340, burstCount:3},
+    reward:450},
+
+  {id:'m9', name:'Debris Storm',   brief:'A shattered moon has filled the sector with dense, fast rock.',  type:'asteroids', target:16, spawn:{asteroidInterval:0.5, enemyInterval:Infinity}, reward:380},
+
+  {id:'m10', name:'Deep Patrol',   brief:'Hold this sector for two full minutes. Hostiles will escalate.', type:'survive',    target:120, spawn:{asteroidInterval:0.9, enemyInterval:2.6, eliteChance:0.2, ramp:true}, reward:520},
+
+  // NEW mission type: 'combo'. Two objectives must BOTH be cleared in the same run.
+  // comboTargets sets the two thresholds independently.
+  {id:'m11', name:'Twin Threat',   brief:'Rock and raiders both — clear a set number of each to secure the lane.', type:'combo',
+    comboTargets:{enemies:5, asteroids:10},
+    spawn:{asteroidInterval:1.2, enemyInterval:3.0, eliteChance:0.1},
+    reward:480},
+
+  {id:'m12', name:'Void Reckoning', brief:'Everything the sector has left, all at once. Good luck, pilot.', type:'enemies',   target:14, timeLimit:150, spawn:{asteroidInterval:0.8, enemyInterval:1.6, eliteChance:0.4, ramp:true}, reward:800},
 ];
 
 /* ---------------------------- game state ---------------------------- */
 const game = {
-  state:'title', // title | hangar | mission | end
+  state:'title', // auth | title | hangar | mission | end
   credits:0,
   upgrades:{weapon:0, engine:0, hull:0, shield:0, missiles:0},
   unlockedMissionIndex:0,
@@ -385,6 +469,122 @@ const game = {
   selectedMissionId:'m1',
   lastEndResult:null,
 };
+
+/* ---------------------------- cloud save (Supabase) ---------------------------- */
+// Fill these in from your Supabase project's dashboard (Settings > API, or the "Connect" button
+// on the project overview page). Use the "Publishable key" if your project has one — it's the
+// current name for what used to be called the "anon" key; both work identically here since
+// access is controlled by the Row Level Security policies on the table (see setup notes), not by
+// keeping this key secret. It's meant to be public and safe to ship in client-side code like this.
+//
+// Leaving these two values as-is disables accounts entirely: the game boots straight to the title
+// screen with no login step and no network calls, exactly like it did before this feature existed.
+const SUPABASE_URL = 'https://smjiqzpkafyqgwjocidm.supabase.co';         // e.g. 'https://abcdefgh.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_yVrergJrniJsIff2FngaAw__S3ajTYC';      // starts with sb_publishable_ (or the legacy anon JWT)
+const AUTH_ENABLED = SUPABASE_URL.startsWith('http') && !SUPABASE_KEY.startsWith('YOUR_');
+
+// The name of the table progress is saved to. Must match the table you create with the setup SQL.
+const PROGRESS_TABLE = 'game_progress';
+
+const supabaseClient = AUTH_ENABLED ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+let currentUser = null;  // the signed-in Supabase user object, or null (guest / auth disabled)
+let guestMode = false;   // true once the player explicitly picks "play as guest" — disables saving
+
+function setAuthMsg(text, kind){
+  const el = document.getElementById('authMsg');
+  el.textContent = text;
+  el.className = 'auth-msg' + (kind ? ' '+kind : '');
+}
+
+async function authSignIn(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if(!email || !password){ setAuthMsg('Enter an email and password.','error'); return; }
+  setAuthMsg('Signing in…','');
+  const {data, error} = await supabaseClient.auth.signInWithPassword({email, password});
+  if(error){ setAuthMsg(error.message,'error'); return; }
+  await onSignedIn(data.user);
+}
+
+async function authSignUp(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if(!email || !password){ setAuthMsg('Enter an email and password.','error'); return; }
+  if(password.length < 6){ setAuthMsg('Password must be at least 6 characters.','error'); return; }
+  setAuthMsg('Creating account…','');
+  const {data, error} = await supabaseClient.auth.signUp({email, password});
+  if(error){ setAuthMsg(error.message,'error'); return; }
+  if(!data.session){
+    // "Confirm email" is on by default for new Supabase projects: signUp succeeds but returns no
+    // session until the player clicks the link in their inbox. Turn this off in Authentication >
+    // Providers > Email in your Supabase dashboard if you'd rather they play immediately.
+    setAuthMsg('Account created — check your email to confirm it, then sign in.','ok');
+    return;
+  }
+  await onSignedIn(data.user);
+}
+
+function authPlayAsGuest(){
+  guestMode = true;
+  currentUser = null;
+  game.state = 'title';
+  showScreen('title');
+}
+
+async function authSignOut(){
+  if(supabaseClient) await supabaseClient.auth.signOut();
+  currentUser = null;
+  guestMode = false;
+  // Reset to clean defaults so the next person to use this browser doesn't inherit this save.
+  game.credits = 0;
+  game.upgrades = {weapon:0, engine:0, hull:0, shield:0, missiles:0};
+  game.unlockedMissionIndex = 0;
+  game.completedMissions = new Set();
+  game.selectedMissionId = 'm1';
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+  setAuthMsg('','');
+  game.state = 'auth';
+  showScreen('auth');
+}
+
+async function onSignedIn(user){
+  currentUser = user;
+  guestMode = false;
+  await loadProgress();
+  game.state = 'title';
+  showScreen('title');
+}
+
+// Loads this player's saved progress into `game`. If they've never saved before (first login),
+// creates their row with the current (fresh) defaults instead.
+async function loadProgress(){
+  if(!AUTH_ENABLED || !currentUser) return;
+  const {data, error} = await supabaseClient
+    .from(PROGRESS_TABLE).select('*').eq('id', currentUser.id).maybeSingle();
+  if(error){ console.error('Failed to load progress:', error.message); return; }
+  if(!data){ await saveProgress(); return; }
+  game.credits = data.credits;
+  game.upgrades = data.upgrades;
+  game.unlockedMissionIndex = data.unlocked_mission_index;
+  game.completedMissions = new Set(data.completed_missions);
+}
+
+// Upserts the player's current progress. Called at natural checkpoints (mission complete, upgrade
+// purchased) rather than continuously, which is both simpler and keeps request volume trivial.
+async function saveProgress(){
+  if(!AUTH_ENABLED || !currentUser || guestMode) return;
+  const {error} = await supabaseClient.from(PROGRESS_TABLE).upsert({
+    id: currentUser.id,
+    credits: game.credits,
+    upgrades: game.upgrades,
+    unlocked_mission_index: game.unlockedMissionIndex,
+    completed_missions: Array.from(game.completedMissions),
+    updated_at: new Date().toISOString(),
+  }, {onConflict:'id'});
+  if(error) console.error('Failed to save progress:', error.message);
+}
 
 let mission = null;
 const bullets=[], enemyBullets=[], missiles=[], asteroids=[], enemies=[], particles=[];
@@ -440,10 +640,10 @@ class Ship{
   }
   update(dt){
     const {wpn,eng,shield,missile} = this.stats;
-    if(keys.has('KeyA') || keys.has('ArrowLeft')) this.angle -= eng.turnSpeed*dt;
-    if(keys.has('KeyD') || keys.has('ArrowRight')) this.angle += eng.turnSpeed*dt;
+    if(keys.has('KeyA')) this.angle -= eng.turnSpeed*dt;
+    if(keys.has('KeyD')) this.angle += eng.turnSpeed*dt;
 
-    this.thrusting = (keys.has('KeyW') || keys.has('ArrowUp'));
+    this.thrusting = keys.has('KeyW');
     if(this.thrusting){
       this.vx += Math.sin(this.angle)*eng.thrust*dt;
       this.vy += -Math.cos(this.angle)*eng.thrust*dt;
@@ -612,12 +812,26 @@ function spawnAsteroidAtEdge(){
 
 /* ---------------------------- enemies ---------------------------- */
 class Enemy{
-  constructor(x,y,elite){
-    this.x=x; this.y=y; this.elite=!!elite;
-    this.radius = this.elite?24:18;
-    this.hp = this.elite?5:2;
-    this.speed = this.elite?150:95;
-    this.fireInterval = this.elite?0.8:1.5;
+  // bossConfig is optional — when present (from a mission's `bossConfig`), it fully overrides
+  // radius/hp/speed/fireInterval/bulletSpeed/burstCount so boss stats live in mission data,
+  // not in this class. Normal/elite enemies are unaffected and behave exactly as before.
+  constructor(x,y,elite,bossConfig){
+    this.x=x; this.y=y; this.elite=!!elite; this.boss=!!bossConfig;
+    if(this.boss){
+      this.radius = bossConfig.radius;
+      this.hp = bossConfig.hp;
+      this.speed = bossConfig.speed;
+      this.fireInterval = bossConfig.fireInterval;
+      this.bulletSpeed = bossConfig.bulletSpeed;
+      this.burstCount = bossConfig.burstCount||1;
+    } else {
+      this.radius = this.elite?24:18;
+      this.hp = this.elite?5:2;
+      this.speed = this.elite?150:95;
+      this.fireInterval = this.elite?0.8:1.5;
+      this.bulletSpeed = this.elite?380:300;
+      this.burstCount = 1;
+    }
     this.fireTimer = rand(0.4,this.fireInterval);
     this.angle=0;
     this.dead=false;
@@ -637,19 +851,31 @@ class Enemy{
     this.fireTimer -= dt;
     if(this.fireTimer<=0 && d<560){
       this.fireTimer = this.fireInterval*rand(0.85,1.15);
-      const spread=(Math.random()-0.5)*0.18;
-      enemyBullets.push(new Bullet(this.x,this.y,this.angle+spread,this.elite?380:300,1));
+      if(this.burstCount<=1){
+        // original single-shot behavior, unchanged for normal/elite enemies
+        const spread=(Math.random()-0.5)*0.18;
+        enemyBullets.push(new Bullet(this.x,this.y,this.angle+spread,this.bulletSpeed,1));
+      } else {
+        // boss volley: fan `burstCount` shots evenly across a fixed arc (radians).
+        // Tune ARC to make bursts feel tighter or wider — it's independent of shot count.
+        const ARC = 0.5;
+        for(let i=0;i<this.burstCount;i++){
+          const t = (i/(this.burstCount-1)) - 0.5; // -0.5..0.5 spread across the burst
+          const spread = t*ARC + (Math.random()-0.5)*0.05;
+          enemyBullets.push(new Bullet(this.x,this.y,this.angle+spread,this.bulletSpeed,1));
+        }
+      }
     }
   }
 }
-function spawnEnemyAtEdge(elite){
+function spawnEnemyAtEdge(elite,bossConfig){
   const edge = Math.floor(rand(0,4));
   let x,y;
   if(edge===0){ x=rand(0,canvas.width); y=-40; }
   else if(edge===1){ x=canvas.width+40; y=rand(0,canvas.height); }
   else if(edge===2){ x=rand(0,canvas.width); y=canvas.height+40; }
   else { x=-40; y=rand(0,canvas.height); }
-  enemies.push(new Enemy(x,y,elite));
+  enemies.push(new Enemy(x,y,elite,bossConfig));
 }
 
 /* ---------------------------- particles ---------------------------- */
@@ -681,11 +907,20 @@ function objectiveText(m){
   if(m.type==='asteroids') return `Destroy ${m.target} asteroids`;
   if(m.type==='enemies') return `Destroy ${m.target} enemy ships${m.timeLimit?` within ${m.timeLimit}s`:''}`;
   if(m.type==='survive') return `Survive ${m.target} seconds`;
+  if(m.type==='boss') return `Destroy the ${m.bossName||'enemy flagship'}`;
+  if(m.type==='combo') return `Destroy ${m.comboTargets.enemies} enemy ships AND ${m.comboTargets.asteroids} asteroids`;
 }
 function objectiveLabel(m){
   if(m.type==='asteroids') return `ASTEROIDS DESTROYED — ${mission.asteroidsDestroyed}/${m.target}`;
   if(m.type==='enemies') return `ENEMIES DESTROYED — ${mission.enemiesDestroyed}/${m.target}`;
   if(m.type==='survive') return `SURVIVE — ${Math.min(mission.timeElapsed,m.target).toFixed(0)}/${m.target}s`;
+  if(m.type==='boss'){
+    // find the live boss to read its current hp; if it's already dead, show 0
+    const boss = enemies.find(e=>e.boss && !e.dead);
+    const hp = boss ? Math.max(0,Math.ceil(boss.hp)) : 0;
+    return `${(m.bossName||'FLAGSHIP').toUpperCase()} INTEGRITY — ${hp}/${m.bossConfig.hp}`;
+  }
+  if(m.type==='combo') return `ENEMIES ${mission.enemiesDestroyed}/${m.comboTargets.enemies} · ASTEROIDS ${mission.asteroidsDestroyed}/${m.comboTargets.asteroids}`;
 }
 
 function launchMission(id){
@@ -695,8 +930,11 @@ function launchMission(id){
   const hullLvl = UPGRADE_TRACKS.hull.levels[game.upgrades.hull];
   mission = {
     id:m.id, type:m.type, target:m.target, timeLimit:m.timeLimit, spawn:m.spawn,
+    bossConfig:m.bossConfig||null,       // only used when type==='boss'
+    comboTargets:m.comboTargets||null,   // only used when type==='combo'
     timeElapsed:0, asteroidsDestroyed:0, enemiesDestroyed:0,
     asteroidTimer:rand(0.4,1.0), enemyTimer:rand(0.8,1.6),
+    bossSpawned:false, bossDefeated:false, // only used when type==='boss'
     lives:hullLvl.maxLives, ended:false,
   };
   game.state='mission';
@@ -715,6 +953,7 @@ function endMission(success, reason){
     game.completedMissions.add(m.id);
     const idx = MISSIONS.findIndex(mm=>mm.id===m.id);
     if(idx+1 < MISSIONS.length) game.unlockedMissionIndex = Math.max(game.unlockedMissionIndex, idx+1);
+    saveProgress(); // fire-and-forget: don't block the end screen on a network round trip
   }
   game.lastEndResult = {success, missionId:m.id, missionName:m.name, creditsEarned, reason};
   game.state='end';
@@ -740,6 +979,14 @@ function updateMission(dt){
 
   let intervalScale=1;
   if(mission.spawn.ramp) intervalScale = Math.max(0.45, 1 - mission.timeElapsed/180);
+
+  // boss missions: spawn the single named boss ~1s after launch, then never spawn another.
+  // Regular enemy spawns are still gated by spawn.enemyInterval, which boss missions set to
+  // Infinity, so this is purely additive and doesn't touch the normal-enemy spawn path below.
+  if(mission.type==='boss' && !mission.bossSpawned && mission.timeElapsed>=1.0){
+    spawnEnemyAtEdge(false, mission.bossConfig);
+    mission.bossSpawned = true;
+  }
 
   if(mission.spawn.asteroidInterval!==Infinity){
     mission.asteroidTimer -= dt;
@@ -799,8 +1046,9 @@ function updateMission(dt){
         if(e.hp<=0){
           e.dead=true;
           mission.enemiesDestroyed++;
-          spawnParticles(e.x,e.y, e.elite?'#ff3d81':'#ff7fae',20,0.6,200);
-          shake(e.elite?6:3);
+          if(e.boss) mission.bossDefeated = true; // flips the 'boss' mission's completion check
+          spawnParticles(e.x,e.y, e.boss?'#ffb84d':(e.elite?'#ff3d81':'#ff7fae'), e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
+          shake(e.boss?12:(e.elite?6:3));
         }
         break;
       }
@@ -826,10 +1074,20 @@ function updateMission(dt){
   for(const e of enemies){
     if(e.dead) continue;
     if(dist2(e,ship) < (e.radius+ship.radius)*(e.radius+ship.radius)){
-      e.dead=true;
-      mission.enemiesDestroyed++;
-      spawnParticles(e.x,e.y,'#ff3d81',20,0.6,200);
       ship.hit();
+      // Bosses are built to take sustained weapon fire, not die to a single ram — a ram just
+      // chips a flat amount of hp off instead of an instant kill. RAM_DAMAGE_BOSS is the only
+      // knob to tune here; 9999 below guarantees normal/elite enemies still die instantly,
+      // exactly matching the old (pre-boss) behavior.
+      const RAM_DAMAGE_BOSS = 3;
+      e.hp -= e.boss ? RAM_DAMAGE_BOSS : 9999;
+      if(e.hp<=0){
+        e.dead=true;
+        mission.enemiesDestroyed++;
+        if(e.boss) mission.bossDefeated = true;
+        spawnParticles(e.x,e.y, e.boss?'#ffb84d':'#ff3d81', e.boss?40:20, e.boss?0.9:0.6, e.boss?260:200);
+        if(e.boss) shake(12);
+      }
     }
   }
   // missiles vs asteroids/enemies (detonate on contact or expiry)
@@ -852,6 +1110,8 @@ function updateMission(dt){
   if(mission.type==='asteroids' && mission.asteroidsDestroyed>=mission.target){ endMission(true); return; }
   if(mission.type==='enemies' && mission.enemiesDestroyed>=mission.target){ endMission(true); return; }
   if(mission.type==='survive' && mission.timeElapsed>=mission.target){ endMission(true); return; }
+  if(mission.type==='boss' && mission.bossDefeated){ endMission(true); return; }
+  if(mission.type==='combo' && mission.enemiesDestroyed>=mission.comboTargets.enemies && mission.asteroidsDestroyed>=mission.comboTargets.asteroids){ endMission(true); return; }
 
   updateHUD();
 }
@@ -920,13 +1180,23 @@ function drawAsteroid(a){
 function drawEnemy(e){
   ctx.save();
   ctx.translate(e.x,e.y); ctx.rotate(e.angle);
-  ctx.strokeStyle = e.elite?'#ff3d81':'#ff7fae';
-  ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = e.elite?14:8;
-  ctx.lineWidth = e.elite?2.5:2;
-  const w = e.elite?16:11;
-  ctx.beginPath();
-  ctx.moveTo(0,14); ctx.lineTo(w,-12); ctx.lineTo(0,-4); ctx.lineTo(-w,-12);
-  ctx.closePath(); ctx.stroke();
+  const color = e.boss ? '#ffb84d' : (e.elite?'#ff3d81':'#ff7fae');
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color; ctx.shadowBlur = e.boss?22:(e.elite?14:8);
+  ctx.lineWidth = e.boss?3.5:(e.elite?2.5:2);
+  if(e.boss){
+    // boss silhouette scales off its configured radius, so any bossConfig.radius still looks right
+    const w = e.radius*0.7, front = e.radius*0.78, back = -e.radius*0.67, notch = -e.radius*0.22;
+    ctx.beginPath();
+    ctx.moveTo(0,front); ctx.lineTo(w,back); ctx.lineTo(0,notch); ctx.lineTo(-w,back);
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,e.radius*0.32,0,Math.PI*2); ctx.stroke(); // core ring, boss-only detail
+  } else {
+    const w = e.elite?16:11;
+    ctx.beginPath();
+    ctx.moveTo(0,14); ctx.lineTo(w,-12); ctx.lineTo(0,-4); ctx.lineTo(-w,-12);
+    ctx.closePath(); ctx.stroke();
+  }
   ctx.restore();
 }
 function drawBullet(b,color){
@@ -1025,6 +1295,15 @@ function enterHangar(){
 
 function renderHangar(){
   document.getElementById('hangarCredits').textContent = `${game.credits} CR`;
+  const pilotTag = document.getElementById('pilotTag');
+  if(AUTH_ENABLED){
+    pilotTag.style.display = 'flex';
+    pilotTag.innerHTML = `<span>${guestMode ? 'Guest' : (currentUser && currentUser.email) || ''}</span>
+      <button id="signOutBtn" class="btn btn-small">${guestMode ? 'Sign In' : 'Sign Out'}</button>`;
+    document.getElementById('signOutBtn').addEventListener('click', authSignOut);
+  } else {
+    pilotTag.style.display = 'none';
+  }
   renderMissionList();
   renderMissionDetail();
   renderUpgrades();
@@ -1101,6 +1380,7 @@ function buyUpgrade(track){
   if(game.credits<cost) return;
   game.credits -= cost;
   game.upgrades[track] = cur+1;
+  saveProgress();
   renderHangar();
 }
 
@@ -1193,6 +1473,13 @@ function renderEndScreen(){
 /* ---------------------------- boot / loop ---------------------------- */
 document.getElementById('startBtn').addEventListener('click', enterHangar);
 document.getElementById('endHangarBtn').addEventListener('click', enterHangar);
+document.getElementById('authSignInBtn').addEventListener('click', authSignIn);
+document.getElementById('authSignUpBtn').addEventListener('click', authSignUp);
+document.getElementById('authGuestLink').addEventListener('click', authPlayAsGuest);
+// Let Enter submit the sign-in form from the password field instead of requiring a mouse click.
+document.getElementById('authPassword').addEventListener('keydown', e=>{
+  if(e.key==='Enter') authSignIn();
+});
 
 let lastTime=null;
 function loop(t){
@@ -1207,9 +1494,25 @@ function loop(t){
   requestAnimationFrame(loop);
 }
 
-resize();
-showScreen('title');
-requestAnimationFrame(loop);
+// Decides the first screen the player sees: straight to the title screen if cloud save isn't
+// configured (see SUPABASE_URL/SUPABASE_KEY above), otherwise the login screen — unless a
+// Supabase session is already stored in this browser, in which case we sign them back in silently.
+async function boot(){
+  resize();
+  requestAnimationFrame(loop); // start the render loop immediately so the starfield never stalls,
+                                // even while the (async) session check below is still in flight
+  if(!AUTH_ENABLED){
+    game.state = 'title';
+    showScreen('title');
+    return;
+  }
+  game.state = 'auth';
+  showScreen('auth');
+  const {data} = await supabaseClient.auth.getSession();
+  if(data.session) await onSignedIn(data.session.user);
+}
+boot();
 </script>
 </body>
+
 </html>
