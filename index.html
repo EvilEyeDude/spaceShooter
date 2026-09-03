@@ -916,11 +916,9 @@ function arenaBroadcastHit(targetId){
   if(!arenaChannel) return;
   arenaChannel.send({type:'broadcast', event:'hit', payload:{shooterId:arenaMyId, targetId}});
 }
-function arenaBroadcastKill(victimId, victimName){
+function arenaBroadcastKill(killerId, killerName, victimId, victimName){
   if(!arenaChannel) return;
-  arenaChannel.send({type:'broadcast', event:'kill', payload:{
-    killerId:arenaMyId, killerName:arenaDisplayName(), victimId, victimName,
-  }});
+  arenaChannel.send({type:'broadcast', event:'kill', payload:{killerId, killerName, victimId, victimName}});
 }
 
 /* ----- incoming broadcasts ----- */
@@ -936,12 +934,15 @@ function arenaHandleFire(msg){
   remoteBullets.push(new RemoteBullet(msg.x, msg.y, msg.angle));
 }
 // A hit event only matters if WE are the named target — every other client just ignores it.
+// The VICTIM is the one who broadcasts the resulting kill (we're the ones who just found out
+// we died), but credit goes to msg.shooterId — not arenaMyId, which is us, the victim.
 function arenaHandleHit(msg){
   if(msg.targetId!==arenaMyId || !arenaShip) return;
   const wasAlive = arenaShip.alive;
   arenaShip.takeHit();
   if(wasAlive && !arenaShip.alive){
-    arenaBroadcastKill(arenaMyId, arenaDisplayName());
+    const shooter = remotePlayers.get(msg.shooterId);
+    arenaBroadcastKill(msg.shooterId, shooter?shooter.name:'Pilot', arenaMyId, arenaDisplayName());
   }
 }
 function arenaHandleKill(msg){
