@@ -384,6 +384,8 @@
     <div class="hud-objective" id="arenaPlayerCount">1 PILOT ONLINE</div>
     <div class="hud-right">
       <div class="hud-lives" id="arenaHealth"></div>
+      <div class="hud-shield hidden" id="arenaShield"></div>
+      <div class="hud-missile hidden" id="arenaMissileStatus">MISSILES READY</div>
       <div class="hud-missile ready" id="arenaMyKills">KILLS: 0</div>
     </div>
   </div>
@@ -392,7 +394,7 @@
     <div class="eyebrow">Leaderboard</div>
     <div id="arenaLeaderboard"></div>
   </div>
-  <div class="hud-hint">W THRUST · A/D ROTATE · SPACE FIRE · ESC EXIT ARENA</div>
+  <div class="hud-hint" id="arenaHint">W THRUST · A/D ROTATE · SPACE FIRE · ESC EXIT ARENA</div>
 </div>
 
 <!-- Supabase client library — only used for the optional cloud-save/account system below.
@@ -709,11 +711,11 @@ const ARENA_SHIP_RADIUS      = 13;           // Collision radius, matches the ca
 const ARENA_LEADERBOARD_SIZE = 10;           // Rows shown on the all-time leaderboard.
 const ARENA_KILLS_TABLE      = 'arena_kills';// Postgres table — see arena_setup.sql.
 
-// PvP uses one fixed loadout instead of each player's campaign upgrades, so a max-upgraded
-// veteran and a brand-new pilot fight on equal footing. Flip this to true to let campaign
-// upgrades carry into the arena instead (note: shields/missiles still won't work in PvP even
-// then — ArenaShip below only implements movement/weapon/health, not the other upgrade tracks).
-const ARENA_USE_CAMPAIGN_STATS = false;
+// PvP now uses each player's campaign upgrades (engine/weapon/hull/shield/missiles) instead
+// of a fixed loadout — a max-upgraded veteran genuinely outguns a fresh pilot, shield charges
+// and all. Flip back to false for equal-footing PvP instead (fixed loadout, no shields, no
+// missiles — see the {...ARENA_STATS, ...} fallback in ArenaShip.stats below).
+const ARENA_USE_CAMPAIGN_STATS = true;
 const ARENA_STATS = {
   thrust:300, maxSpeed:360, turnSpeed:3.8,   // engine
   cooldown:0.22, bulletSpeed:600, damage:1,  // weapon
@@ -722,31 +724,53 @@ const ARENA_STATS = {
 /* ---------------------------- arena ship (local player) ----------------------------
    Flight model deliberately mirrors Ship.update() above (same wrap/damping/thrust math) so
    the arena feels identical to the campaign — only the health/respawn system differs, since
-   PvP has no lives/mission-shield concept. */
+   PvP has no lives/mission-shield concept.
+
+   When ARENA_USE_CAMPAIGN_STATS is on, max health and spawn invulnerability come from the
+   player's hull upgrade (same maxLives/invuln stats the campaign uses), and shield charges /
+   missiles come straight from their respective upgrade tracks too — rather than the fixed
+   ARENA_MAX_HEALTH/ARENA_SPAWN_INVULN constants and no-shield/no-missile equal-footing mode.
+   Because two players can have different hull levels, maxHealth is broadcast alongside health
+   (see arenaBroadcastState) so everyone's health bar reads the correct fraction. */
 class ArenaShip{
   constructor(){ this.respawn(); }
   respawn(){
+    const hull = ARENA_USE_CAMPAIGN_STATS ? UPGRADE_TRACKS.hull.levels[game.upgrades.hull] : null;
+    const shieldLvl = ARENA_USE_CAMPAIGN_STATS ? UPGRADE_TRACKS.shield.levels[game.upgrades.shield] : {maxCharges:0, regenTime:0};
+    this.maxHealth = hull ? hull.maxLives : ARENA_MAX_HEALTH;
     this.x = rand(80, canvas.width-80);
     this.y = rand(80, canvas.height-80);
     this.vx=0; this.vy=0; this.angle=rand(0,Math.PI*2);
     this.radius = ARENA_SHIP_RADIUS;
-    this.health = ARENA_MAX_HEALTH;
-    this.invulnTimer = ARENA_SPAWN_INVULN;
+    this.health = this.maxHealth;
+    this.invulnTimer = hull ? hull.invuln : ARENA_SPAWN_INVULN;
     this.fireCooldown=0;
+    this.missileCooldown=0;
     this.thrusting=false;
     this.alive=true;
     this.deadTimer=0;
+    // Shield fields mirror the campaign Ship class's naming (this.shield = current charges,
+    // stats.shield.maxCharges = the cap) so the shared drawShip() function needs no changes
+    // to render either ship's shield ring.
+    this.shieldMax = shieldLvl.maxCharges;
+    this.shield = this.shieldMax;
+    this.shieldRegenTime = shieldLvl.regenTime;
+    this.shieldRegenTimer = this.shieldRegenTime;
+    this.shieldFlash = 0;
   }
-  // shield:{maxCharges:0} is a stub so the shared drawShip() function (used for both the
-  // campaign ship and this one) can safely check for a shield without special-casing arena mode.
   get stats(){
-    if(!ARENA_USE_CAMPAIGN_STATS) return {...ARENA_STATS, shield:{maxCharges:0}};
+    if(!ARENA_USE_CAMPAIGN_STATS) return {
+      ...ARENA_STATS,
+      shield:{maxCharges:0, regenTime:0},
+      missile:{count:0, cooldown:0, damage:0, splash:0},
+    };
     const eng = UPGRADE_TRACKS.engine.levels[game.upgrades.engine];
     const wpn = UPGRADE_TRACKS.weapon.levels[game.upgrades.weapon];
     return {
       thrust:eng.thrust, maxSpeed:eng.maxSpeed, turnSpeed:eng.turnSpeed,
       cooldown:wpn.cooldown, bulletSpeed:wpn.bulletSpeed, damage:wpn.damage,
-      shield:{maxCharges:0},
+      shield:UPGRADE_TRACKS.shield.levels[game.upgrades.shield],
+      missile:UPGRADE_TRACKS.missiles.levels[game.upgrades.missiles],
     };
   }
   update(dt){
@@ -771,6 +795,11 @@ class ArenaShip{
     this.y = wrap(this.y + this.vy*dt, canvas.height);
 
     if(this.invulnTimer>0) this.invulnTimer -= dt;
+    if(this.shieldFlash>0) this.shieldFlash = Math.max(0, this.shieldFlash-dt);
+    if(this.shieldMax>0 && this.shield<this.shieldMax){
+      this.shieldRegenTimer -= dt;
+      if(this.shieldRegenTimer<=0){ this.shield++; this.shieldRegenTimer = this.shieldRegenTime; }
+    }
 
     this.fireCooldown -= dt;
     if(keys.has('Space') && this.fireCooldown<=0){
@@ -781,12 +810,37 @@ class ArenaShip{
       spawnParticles(noseX,noseY,'#4ff0ff',2,0.15,90);
       arenaBroadcastFire(noseX,noseY,this.angle); // cosmetic bullet on everyone else's screen
     }
+
+    this.missileCooldown -= dt;
+    if((keys.has('ShiftLeft')||keys.has('ShiftRight')) && s.missile.count>0 && this.missileCooldown<=0){
+      this.missileCooldown = s.missile.cooldown;
+      const offsets = s.missile.count>1 ? [-0.12,0.12] : [0];
+      for(const off of offsets){
+        const a = this.angle+off;
+        const noseX = this.x + Math.sin(a)*this.radius*1.4;
+        const noseY = this.y - Math.cos(a)*this.radius*1.4;
+        arenaMissiles.push(new Missile(noseX,noseY,a,s.missile.damage,s.missile.splash));
+      }
+      spawnParticles(this.x,this.y,'#ffb84d',8,0.25,140);
+      arenaBroadcastFireMissile(this.x,this.y,this.angle); // cosmetic missile on everyone else's screen
+    }
   }
-  // Called when a broadcast 'hit' event names US as the target. We are the sole authority over
-  // our OWN health — see the module comment above for why hit detection works this way.
-  takeHit(){
+  // Called when a broadcast 'hit' event names US as the target, with the amount of damage that
+  // shot/missile deals. We are the sole authority over our OWN health/shield — see the module
+  // comment above for why hit resolution works this way. A shield charge blocks the ENTIRE hit
+  // regardless of its damage amount (matches how shields work in the campaign) before any
+  // damage amount is applied to health.
+  takeHit(amount=1){
     if(this.invulnTimer>0 || !this.alive) return false;
-    this.health--;
+    if(this.shield>0){
+      this.shield--;
+      this.shieldRegenTimer = this.shieldRegenTime;
+      this.shieldFlash = 0.3;
+      shake(6);
+      spawnParticles(this.x,this.y,'#7fd7ff',16,0.4,180);
+      return true;
+    }
+    this.health -= amount;
     spawnParticles(this.x,this.y,'#7fd7ff',12,0.35,160);
     shake(6);
     if(this.health<=0){
@@ -807,11 +861,13 @@ class RemotePlayer{
     this.id=id; this.name=name||'Pilot';
     this.x=canvas.width/2; this.y=canvas.height/2; this.angle=0;
     this.targetX=this.x; this.targetY=this.y; this.targetAngle=this.angle;
-    this.health=ARENA_MAX_HEALTH; this.alive=true; this.thrusting=false;
+    this.health=ARENA_MAX_HEALTH; this.maxHealth=ARENA_MAX_HEALTH; this.alive=true; this.thrusting=false;
+    this.shield=0; this.shieldMax=0;
   }
   applyState(msg){
     this.targetX=msg.x; this.targetY=msg.y; this.targetAngle=msg.angle;
-    this.health=msg.health; this.alive=msg.alive; this.thrusting=msg.thrusting;
+    this.health=msg.health; this.maxHealth=msg.maxHealth||ARENA_MAX_HEALTH; this.alive=msg.alive; this.thrusting=msg.thrusting;
+    this.shield=msg.shield||0; this.shieldMax=msg.shieldMax||0;
   }
   update(dt){
     // Shortest-path angle lerp so ships don't spin the long way round crossing the 0/2π seam.
@@ -840,10 +896,29 @@ class RemoteBullet{
   }
 }
 
+// Same idea as RemoteBullet but for missiles — cosmetic only, drawn with the existing
+// drawMissile() (which only ever reads .x/.y/.angle, so no changes needed there). The speed
+// constant matches the campaign Missile class's own hardcoded speed, purely for visual match.
+class RemoteMissile{
+  constructor(x,y,angle){
+    this.x=x; this.y=y; this.angle=angle;
+    this.vx=Math.sin(angle)*360; this.vy=-Math.cos(angle)*360;
+    this.life=1.8;
+  }
+  update(dt){
+    this.x=wrap(this.x+this.vx*dt,canvas.width);
+    this.y=wrap(this.y+this.vy*dt,canvas.height);
+    this.life-=dt;
+    if(Math.random()<0.6) spawnParticles(this.x,this.y,'#ffb84d',1,0.2,20);
+  }
+}
+
 /* ---------------------------- arena state ---------------------------- */
 let arenaShip = null;              // this client's ArenaShip, created on entering the arena
 const arenaBullets = [];           // this client's own bullets — collision authority lives here
 const remoteBullets = [];          // cosmetic-only bullets from other players
+const arenaMissiles = [];          // this client's own missiles — collision authority lives here
+const remoteMissiles = [];         // cosmetic-only missiles from other players
 const remotePlayers = new Map();   // id -> RemotePlayer, everyone else currently in the arena
 const arenaScoreboard = new Map(); // id -> {name, kills} — THIS SESSION's live scoreboard, resets on reload
 let arenaChannel = null;           // the Supabase Realtime channel while connected
@@ -860,7 +935,7 @@ async function enterArena(){
   if(!AUTH_ENABLED) return; // arenaBtn is hidden in this case anyway (see boot() below)
   arenaMyId = crypto.randomUUID();
   arenaShip = new ArenaShip();
-  arenaBullets.length=0; remoteBullets.length=0; particles.length=0;
+  arenaBullets.length=0; remoteBullets.length=0; arenaMissiles.length=0; remoteMissiles.length=0; particles.length=0;
   remotePlayers.clear(); arenaScoreboard.clear(); arenaKillFeed=[];
 
   game.state='arena';
@@ -875,6 +950,7 @@ async function enterArena(){
   arenaChannel
     .on('broadcast', {event:'state'}, ({payload})=> arenaHandleState(payload))
     .on('broadcast', {event:'fire'},  ({payload})=> arenaHandleFire(payload))
+    .on('broadcast', {event:'firemissile'}, ({payload})=> arenaHandleFireMissile(payload))
     .on('broadcast', {event:'hit'},   ({payload})=> arenaHandleHit(payload))
     .on('broadcast', {event:'kill'},  ({payload})=> arenaHandleKill(payload))
     .on('presence', {event:'join'},  ({key,newPresences})=> arenaHandlePresenceJoin(key,newPresences))
@@ -903,18 +979,25 @@ function arenaBroadcastState(){
   arenaChannel.send({type:'broadcast', event:'state', payload:{
     id:arenaMyId, name:arenaDisplayName(),
     x:arenaShip.x, y:arenaShip.y, angle:arenaShip.angle,
-    thrusting:arenaShip.thrusting, health:arenaShip.health, alive:arenaShip.alive,
+    thrusting:arenaShip.thrusting, health:arenaShip.health, maxHealth:arenaShip.maxHealth, alive:arenaShip.alive,
+    shield:arenaShip.shield, shieldMax:arenaShip.shieldMax,
   }});
 }
 function arenaBroadcastFire(x,y,angle){
   if(!arenaChannel) return;
   arenaChannel.send({type:'broadcast', event:'fire', payload:{id:arenaMyId, x, y, angle}});
 }
-// Sent when OUR bullet hits a remote player — see the module comment for why the shooter
-// decides this and the target applies it, rather than the other way round.
-function arenaBroadcastHit(targetId){
+function arenaBroadcastFireMissile(x,y,angle){
   if(!arenaChannel) return;
-  arenaChannel.send({type:'broadcast', event:'hit', payload:{shooterId:arenaMyId, targetId}});
+  arenaChannel.send({type:'broadcast', event:'firemissile', payload:{id:arenaMyId, x, y, angle}});
+}
+// Sent when OUR bullet/missile hits a remote player — see the module comment for why the
+// shooter decides this and the target applies it, rather than the other way round. `damage`
+// carries the shooter's actual weapon/missile damage level, so upgrades matter in PvP too —
+// the target still decides whether a shield absorbs it before any of that damage lands.
+function arenaBroadcastHit(targetId, damage){
+  if(!arenaChannel) return;
+  arenaChannel.send({type:'broadcast', event:'hit', payload:{shooterId:arenaMyId, targetId, damage}});
 }
 function arenaBroadcastKill(killerId, killerName, victimId, victimName){
   if(!arenaChannel) return;
@@ -933,13 +1016,17 @@ function arenaHandleFire(msg){
   if(msg.id===arenaMyId) return;
   remoteBullets.push(new RemoteBullet(msg.x, msg.y, msg.angle));
 }
+function arenaHandleFireMissile(msg){
+  if(msg.id===arenaMyId) return;
+  remoteMissiles.push(new RemoteMissile(msg.x, msg.y, msg.angle));
+}
 // A hit event only matters if WE are the named target — every other client just ignores it.
 // The VICTIM is the one who broadcasts the resulting kill (we're the ones who just found out
 // we died), but credit goes to msg.shooterId — not arenaMyId, which is us, the victim.
 function arenaHandleHit(msg){
   if(msg.targetId!==arenaMyId || !arenaShip) return;
   const wasAlive = arenaShip.alive;
-  arenaShip.takeHit();
+  arenaShip.takeHit(msg.damage||1);
   if(wasAlive && !arenaShip.alive){
     const shooter = remotePlayers.get(msg.shooterId);
     arenaBroadcastKill(msg.shooterId, shooter?shooter.name:'Pilot', arenaMyId, arenaDisplayName());
@@ -997,6 +1084,8 @@ function updateArena(dt){
   for(const rp of remotePlayers.values()) rp.update(dt);
   for(const b of arenaBullets) b.update(dt);
   for(const b of remoteBullets) b.update(dt);
+  for(const m of arenaMissiles) m.update(dt);
+  for(const m of remoteMissiles) m.update(dt);
   for(const p of particles) p.update(dt);
 
   // Our bullets vs every remote player currently alive — WE decide our own hits (see the
@@ -1008,23 +1097,74 @@ function updateArena(dt){
       if(dist2(b, rp) < (b.radius+ARENA_SHIP_RADIUS)*(b.radius+ARENA_SHIP_RADIUS)){
         b.life=0;
         spawnParticles(b.x,b.y,'#ff9fc3',6,0.3,120);
-        arenaBroadcastHit(rp.id);
+        arenaBroadcastHit(rp.id, b.damage);
         break;
       }
     }
   }
 
+  // Our missiles: detonate on contact with any remote player or on expiry, same as the
+  // campaign's explodeMissile() but against remotePlayers instead of asteroids/enemies.
+  for(const m of arenaMissiles){
+    if(m.exploded) continue;
+    let hit=false;
+    for(const rp of remotePlayers.values()){
+      if(rp.alive && dist2(m,rp) < (m.radius+ARENA_SHIP_RADIUS)*(m.radius+ARENA_SHIP_RADIUS)){ hit=true; break; }
+    }
+    if(hit || m.life<=0){ m.exploded=true; explodeArenaMissile(m); }
+  }
+
   filterInPlace(arenaBullets, b=>b.life>0);
   filterInPlace(remoteBullets, b=>b.life>0);
+  filterInPlace(arenaMissiles, m=>!m.exploded);
+  filterInPlace(remoteMissiles, m=>m.life>0);
   filterInPlace(particles, p=>p.life>0);
 
   updateArenaHUD();
 }
 
+// Splash-damages every remote player within blast radius, same idea as the campaign's
+// explodeMissile() — each one gets its own 'hit' broadcast (with the missile's damage) rather
+// than a single event, since different targets may have different shields/health.
+function explodeArenaMissile(m){
+  spawnParticles(m.x,m.y,'#ffb84d',24,0.6,220);
+  shake(8);
+  for(const rp of remotePlayers.values()){
+    if(!rp.alive) continue;
+    if(dist2(m,rp) < (m.splash+ARENA_SHIP_RADIUS)*(m.splash+ARENA_SHIP_RADIUS)){
+      arenaBroadcastHit(rp.id, m.damage);
+    }
+  }
+}
+
 function updateArenaHUD(){
   if(!arenaShip) return;
-  document.getElementById('arenaHealth').innerHTML = Array.from({length:ARENA_MAX_HEALTH}).map((_,i)=>
+  document.getElementById('arenaHealth').innerHTML = Array.from({length:arenaShip.maxHealth}).map((_,i)=>
     `<span class="life-icon ${i<arenaShip.health?'':'spent'}">▲</span>`).join('');
+
+  const shieldRow = document.getElementById('arenaShield');
+  if(arenaShip.shieldMax>0){
+    shieldRow.classList.remove('hidden');
+    shieldRow.innerHTML = Array.from({length:arenaShip.shieldMax}).map((_,i)=>
+      `<span class="shield-icon ${i<arenaShip.shield?'':'spent'}">◆</span>`).join('');
+  } else {
+    shieldRow.classList.add('hidden');
+  }
+
+  const missileStats = arenaShip.stats.missile;
+  const missileRow = document.getElementById('arenaMissileStatus');
+  if(missileStats.count>0){
+    missileRow.classList.remove('hidden');
+    const ready = arenaShip.missileCooldown<=0;
+    missileRow.textContent = ready ? 'MISSILES READY' : `MISSILE ${Math.ceil(arenaShip.missileCooldown)}s`;
+    missileRow.classList.toggle('ready', ready);
+  } else {
+    missileRow.classList.add('hidden');
+  }
+  document.getElementById('arenaHint').textContent = missileStats.count>0
+    ? 'W THRUST · A/D ROTATE · SPACE FIRE · SHIFT MISSILE · ESC EXIT ARENA'
+    : 'W THRUST · A/D ROTATE · SPACE FIRE · ESC EXIT ARENA';
+
   document.getElementById('arenaKillFeed').innerHTML = arenaKillFeed.map(l=>`<div>${l}</div>`).join('');
   const myEntry = arenaScoreboard.get(arenaMyId);
   document.getElementById('arenaMyKills').textContent = `KILLS: ${myEntry?myEntry.kills:0}`;
@@ -1045,12 +1185,21 @@ function drawRemotePlayer(rp){
   }
   ctx.restore();
 
+  if(rp.shieldMax>0 && rp.shield>0){
+    ctx.save();
+    ctx.translate(rp.x, rp.y);
+    ctx.globalAlpha = 0.2 + 0.5*(rp.shield/rp.shieldMax);
+    ctx.strokeStyle='#7fd7ff'; ctx.shadowColor='#7fd7ff'; ctx.shadowBlur=14; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.font='11px Orbitron, sans-serif'; ctx.fillStyle='#8095b8'; ctx.textAlign='center';
   ctx.fillText(rp.name, rp.x, rp.y-30);
   const barW=28;
   ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(rp.x-barW/2, rp.y-26, barW, 3);
-  ctx.fillStyle='#ff3d81'; ctx.fillRect(rp.x-barW/2, rp.y-26, barW*Math.max(0,rp.health/ARENA_MAX_HEALTH), 3);
+  ctx.fillStyle='#ff3d81'; ctx.fillRect(rp.x-barW/2, rp.y-26, barW*Math.max(0,rp.health/rp.maxHealth), 3);
   ctx.restore();
 }
 
@@ -1712,6 +1861,8 @@ function render(dt){
     }
     for(const b of arenaBullets) drawBullet(b,'#4ff0ff');
     for(const b of remoteBullets) drawBullet(b,'#ff3d81');
+    for(const m of arenaMissiles) drawMissile(m);
+    for(const m of remoteMissiles) drawMissile(m);
     for(const p of particles) drawParticle(p);
     for(const rp of remotePlayers.values()) if(rp.alive) drawRemotePlayer(rp);
     if(arenaShip.alive) drawShip(arenaShip);
